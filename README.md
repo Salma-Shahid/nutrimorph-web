@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🥗 NutriMorph — AI Nutritionist & Macro Coach
 
-## Getting Started
+NutriMorph is an end-to-end, cross-platform AI-powered health and nutrition management platform. It allows users to track daily macros, analyze meal photos using Google Gemini AI, interact with a personalized voice/text conversational coach (**NutriBot**), and manage Pro subscriptions via RevenueCat.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🌟 Key Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **📊 Daily Macro & Calorie Tracker**: Interactive progress bars and weekly trend charts for tracking Calories, Protein, Carbs, and Fats.
+- **📸 AI Meal Scanner**: Visual meal recognition powered by Google Gemini AI (`gemini-3.5-flash-lite`) to extract nutritional estimates directly from meal photos.
+- **🤖 NutriBot AI Assistant**: Smart conversational AI assistant capable of creating custom meal plans, evaluating macro goals, and giving personalized dietary advice.
+- **🌓 Global Light / Dark Mode**: Seamless theme switching managed through global Zustand state and persistent local storage.
+- **🔒 Dynamic Authentication & Profile Management**: Secure JWT-based authentication, user onboarding, profile updates, and image uploads.
+- **⭐ RevenueCat Subscription Integration**: Integrated Pro Plan upgrade flow supporting in-app purchases and entitlement verification.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠️ Tech Stack
 
-## Learn More
+### 1. Mobile Application (`/nutrimorph`)
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework**: React Native with Expo (SDK 52+)
+- **Navigation**: React Navigation (Bottom Tabs Navigator + Native Stack)
+- **State Management**: Zustand (Global Auth, User Profile, Theme State)
+- **API Client**: Axios
+- **In-App Purchases**: RevenueCat SDK (`react-native-purchases`)
+- **Icons & UI**: Expo Vector Icons (`Ionicons`), Safe Area Context
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2. Backend Service (`/nutrimorph-backend`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Runtime**: Node.js & Express.js
+- **Database**: MongoDB Atlas with Mongoose ODM
+- **AI Engine**: Google Generative AI SDK (`@google/generative-ai`) — **Model**: `gemini-3.5-flash-lite`
+- **Security**: JSON Web Token (JWT) & Passwords hashed with `bcryptjs`
+- **Deployment**: Vercel Serverless Functions
 
-## Deploy on Vercel
+### 3. Web Dashboard (`/nutrimorph-web`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Framework**: Next.js (App Router, React 19)
+- **Styling**: Tailwind CSS
+- **Fonts**: Geist & Geist Mono
+- **Deployment**: Vercel
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## ⚙️ Environment Variables Setup
+
+Ensure you configure `.env` files across your services before launching:
+
+### Mobile App (`/nutrimorph/.env`)
+
+env
+EXPO_PUBLIC_API_URL=[https://nutrimorph-backend.vercel.app](https://nutrimorph-backend.vercel.app)
+EXPO_PUBLIC_REVENUECAT_KEY=your_revenuecat_api_key
+
+Backend API (/nutrimorph-backend/.env)
+Code snippet
+PORT=5000
+MONGO_URI=your_mongodb_atlas_connection_string
+JWT_SECRET=your_jwt_secret_key
+GEMINI_API_KEY=your_google_gemini_api_key
+🚀 Getting Started
+
+1. Run Mobile App
+   Bash
+   cd nutrimorph
+   npm install
+   npx expo start -c
+2. Run Backend Server
+   Bash
+   cd nutrimorph-backend
+   npm install
+   npm run dev
+3. Run Web Dashboard
+   Bash
+   cd nutrimorph-web
+   npm install
+   npm run dev
+   📁 Repository Structure
+   nutrimorph-ecosystem/
+   ├── nutrimorph/ # React Native Expo Mobile App
+   │ ├── src/
+   │ │ ├── navigation/ # AppNavigator (Bottom Tabs + Stack)
+   │ │ ├── screens/ # Dashboard, MealScanner, ChatBot, Profile, Subscription
+   │ │ ├── store/ # useAuthStore (Zustand state)
+   │ │ └── theme/ # Theme colors & light/dark mode logic
+   │ └── App.js # App entry point with safe boot loading
+   ├── nutrimorph-backend/ # Node.js / Express API Server
+   │ ├── controllers/ # Auth, Meal, ChatBot controllers
+   │ ├── models/ # User, Meal, Chat log Mongoose schemas
+   │ └── server.js # API entry & Vercel deployment handler
+   └── nutrimorph-web/ # Next.js Landing & Dashboard Web App
+   └── app/ # Next.js App Router structure
+   📜 License
+   This project is developed and maintained by Salma Shahid. All rights reserved.
