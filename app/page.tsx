@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -18,6 +18,8 @@ import {
   Quote,
   ChevronDown,
   Mail,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 
 interface CheckoutPayload {
@@ -35,17 +37,84 @@ interface CheckoutResponse {
 export default function Home() {
   const [isYearly, setIsYearly] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [loginErrorMessage, setLoginErrorMessage] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+    window.location.reload();
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginErrorMessage("");
+
+    try {
+      const apiEndpoint =
+        process.env.NEXT_PUBLIC_BACKEND_URL ||
+        "https://nutrimorph-backend.vercel.app";
+
+      const res = await fetch(`${apiEndpoint}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      const token = data.token || data.accessToken;
+      if (token) {
+        localStorage.setItem("token", token);
+        setIsLoggedIn(true);
+        setShowLoginModal(false);
+        setPassword("");
+        alert("Login successful!");
+      } else {
+        throw new Error("Token not received from server.");
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setLoginErrorMessage(err.message);
+      } else {
+        setLoginErrorMessage("An unexpected error occurred during login.");
+      }
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
   };
 
   const handlePlanSelect = (planName: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to your account first.");
+      setShowLoginModal(true);
+      return;
+    }
+
     setSelectedPlan(planName);
     setShowSubModal(true);
     setErrorMessage("");
@@ -188,6 +257,24 @@ export default function Home() {
               <ShieldAlert className="w-4 h-4" />
               <span>Delete Account</span>
             </Link>
+
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-xl transition flex items-center space-x-1"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl transition flex items-center space-x-1"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Login</span>
+              </button>
+            )}
           </nav>
         </div>
       </header>
@@ -634,7 +721,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Subscription Modal */}
+      {/* Subscription Checkout Modal */}
       {showSubModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl relative shadow-2xl">
@@ -685,6 +772,71 @@ export default function Home() {
                 <span>
                   {loading ? "Processing..." : "Proceed to Secure Checkout"}
                 </span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl relative shadow-2xl">
+            <button
+              onClick={() => setShowLoginModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-bold text-white mb-2">
+              Login to NutriMorph
+            </h3>
+            <p className="text-sm text-slate-400 mb-4">
+              Enter your account credentials to access subscriptions.
+            </p>
+
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {loginErrorMessage && (
+                <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
+                  {loginErrorMessage}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition flex items-center justify-center space-x-2 disabled:opacity-50"
+              >
+                {loginLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{loginLoading ? "Logging in..." : "Login"}</span>
               </button>
             </form>
           </div>
