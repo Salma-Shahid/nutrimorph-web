@@ -3,17 +3,34 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Bot,
-  Camera,
-  PieChart,
-  ShieldCheck,
   Zap,
-  ArrowRight,
   Smartphone,
-  Check,
   X,
   Loader2,
+  ShieldAlert,
+  Camera,
+  Bot,
+  PieChart,
+  Download,
+  Sparkles,
+  CheckCircle2,
+  Star,
+  Quote,
+  ChevronDown,
+  Mail,
 } from "lucide-react";
+
+interface CheckoutPayload {
+  plan: string;
+  billingCycle: "monthly" | "yearly";
+  email: string;
+  aiModel: string;
+}
+
+interface CheckoutResponse {
+  url?: string;
+  message?: string;
+}
 
 export default function Home() {
   const [isYearly, setIsYearly] = useState(false);
@@ -22,15 +39,18 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  // Handle plan selection and open subscription modal
+  const toggleFaq = (index: number) => {
+    setOpenFaq(openFaq === index ? null : index);
+  };
+
   const handlePlanSelect = (planName: string) => {
     setSelectedPlan(planName);
     setShowSubModal(true);
     setErrorMessage("");
   };
 
-  // Handle direct payment and backend integration for subscriptions
   const handleSubscriptionCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -42,10 +62,8 @@ export default function Home() {
     setErrorMessage("");
 
     try {
-      // LocalStorage se user ka auth token retrieve karein (protect middleware ke liye)
       const token = localStorage.getItem("token");
 
-      // API call to nutrimorph-backend payment endpoint
       const response = await processBackendCheckout(
         {
           plan: selectedPlan,
@@ -57,33 +75,42 @@ export default function Home() {
       );
 
       if (response.url) {
-        // Redirect user to secure Stripe payment gateway URL returned by backend
-        window.location.href = response.url;
+        window.location.assign(response.url);
       } else {
         throw new Error("Invalid payment gateway response.");
       }
-    } catch (err: any) {
-      setErrorMessage(
-        err.message || "Failed to process payment. Please try again.",
-      );
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message.includes("Failed to fetch")) {
+          setErrorMessage(
+            "Backend is waking up or unreachable. Please try again in 30 seconds.",
+          );
+        } else {
+          setErrorMessage(err.message);
+        }
+      } else {
+        setErrorMessage("Failed to process payment. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Backend communication helper (Updated with correct payment endpoint & Auth header)
-  const processBackendCheckout = async (payload: any, token: string | null) => {
+  const processBackendCheckout = async (
+    payload: CheckoutPayload,
+    token: string | null,
+  ): Promise<CheckoutResponse> => {
     const apiEndpoint =
       process.env.NEXT_PUBLIC_BACKEND_URL ||
       "https://nutrimorph-backend.onrender.com";
 
     const res = await fetch(
-      `${apiEndpoint}/api/payment/create-checkout-session`, // Corrected route path matching backend
+      `${apiEndpoint}/api/payment/create-checkout-session`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}), // Pass token if available
+          ...(token ? { Authorization: `Bearer ` + token } : {}),
         },
         body: JSON.stringify(payload),
       },
@@ -114,22 +141,48 @@ export default function Home() {
           </Link>
           <nav className="hidden md:flex items-center space-x-6 text-sm text-slate-300 font-medium">
             <Link
+              href="#how-it-works"
+              className="hover:text-emerald-400 transition"
+            >
+              How It Works
+            </Link>
+            <Link
               href="#features"
               className="hover:text-emerald-400 transition"
             >
               Features
             </Link>
+            <Link
+              href="#testimonials"
+              className="hover:text-emerald-400 transition"
+            >
+              Reviews
+            </Link>
+            <Link href="#faq" className="hover:text-emerald-400 transition">
+              FAQ
+            </Link>
             <Link href="#pricing" className="hover:text-emerald-400 transition">
               Plans
+            </Link>
+            <Link
+              href="/contact"
+              className="hover:text-emerald-400 transition flex items-center space-x-1"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Support</span>
             </Link>
             <Link
               href="/privacy-policy"
               className="hover:text-emerald-400 transition"
             >
-              Privacy Policy
+              Privacy
             </Link>
-            <Link href="/terms" className="hover:text-emerald-400 transition">
-              Terms
+            <Link
+              href="/delete-account"
+              className="text-red-400 hover:text-red-300 transition flex items-center space-x-1"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>Delete Account</span>
             </Link>
           </nav>
         </div>
@@ -149,254 +202,485 @@ export default function Home() {
           Snap photos of your food, track daily macros, and chat with NutriBot
           for instant personalized dietary guidance and fitness plans.
         </p>
+
+        {/* Download Buttons (Google Play & App Store Badges) */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a
-            href="#pricing"
-            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-8 py-4 rounded-xl transition shadow-lg shadow-emerald-500/20"
-          >
-            <Smartphone className="w-5 h-5" />
-            <span>View Plans & Subscribe</span>
-          </a>
           <a
             href="https://play.google.com/store/apps/details?id=com.salmashahid.nutrimorph"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto inline-flex items-center justify-center space-x-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold px-8 py-4 rounded-xl transition border border-slate-700 shadow-xl"
+            className="w-full sm:w-auto inline-flex items-center justify-center space-x-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold px-6 py-3.5 rounded-xl transition"
           >
-            <svg
-              className="w-5 h-5 fill-current text-emerald-400"
-              viewBox="0 0 24 24"
-            >
-              <path d="M3.609 1.814L13.792 12 3.61 22.186a1.5 1.5 0 0 1-.61-1.21V3.024a1.5 1.5 0 0 1 .609-1.21zM15.208 13.416l2.122 2.122-11.233 6.49a1.5 1.5 0 0 1-1.498 0l10.609-8.612zm0-2.832L4.599 1.972a1.5 1.5 0 0 1 1.498 0l11.233 6.49-2.122 2.122zm1.414 1.414l3.536 2.042a1.25 1.25 0 0 1 0 2.164l-3.536 2.042-2.122-2.122 2.122-2.126z" />
-            </svg>
-            <span>Download on Google Play</span>
+            <Download className="w-5 h-5 text-emerald-400" />
+            <div className="text-left">
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider">
+                Download on
+              </div>
+              <div className="text-sm font-semibold">Google Play Store</div>
+            </div>
+          </a>
+          <a
+            href="#coming-soon"
+            className="w-full sm:w-auto inline-flex items-center justify-center space-x-3 bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold px-6 py-3.5 rounded-xl transition opacity-90"
+          >
+            <Smartphone className="w-5 h-5 text-slate-400" />
+            <div className="text-left">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider">
+                Coming Soon on
+              </div>
+              <div className="text-sm font-semibold">Apple App Store</div>
+            </div>
           </a>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="text-2xl md:text-3xl font-bold text-center text-white mb-12">
-          Everything You Need to Transform Your Diet
-        </h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl">
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl w-fit mb-6">
-              <Bot className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-3">
-              NutriBot AI Assistant
-            </h3>
-            <p className="text-slate-400 leading-relaxed text-sm">
-              Ask about diet plans, macro breakdowns, and recipes. Get custom
-              advice tailored directly to your weight and fitness goals.
-            </p>
-          </div>
+      {/* How It Works Section */}
+      <section
+        id="how-it-works"
+        className="max-w-6xl mx-auto px-6 py-20 border-t border-slate-900"
+      >
+        <div className="text-center mb-16">
+          <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full">
+            Simple 3-Step Process
+          </span>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-3 mb-4">
+            How NutriMorph Works
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto text-sm md:text-base">
+            Transform your health journey in seconds with our automated AI
+            assistant.
+          </p>
+        </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl">
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl w-fit mb-6">
+        <div className="grid md:grid-cols-3 gap-8 relative">
+          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl relative flex flex-col text-left">
+            <div className="text-emerald-500 font-black text-4xl mb-4 opacity-40">
+              01
+            </div>
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
               <Camera className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-3">
-              Instant Photo Scanning
+            <h3 className="text-xl font-bold text-white mb-2">
+              Snap Your Food
             </h3>
-            <p className="text-slate-400 leading-relaxed text-sm">
-              Upload a picture of your meal and let our multimodal AI identify
-              ingredients, estimate portion sizes, and calculate calories.
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Take a quick picture of any meal or plate. No manual logging or
+              searching complex databases required.
             </p>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl">
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl w-fit mb-6">
+          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl relative flex flex-col text-left">
+            <div className="text-emerald-500 font-black text-4xl mb-4 opacity-40">
+              02
+            </div>
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">AI Analysis</h3>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Gemini Flash AI instantly detects ingredients, estimates portion
+              sizes, and calculates calories & macros.
+            </p>
+          </div>
+
+          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl relative flex flex-col text-left">
+            <div className="text-emerald-500 font-black text-4xl mb-4 opacity-40">
+              03
+            </div>
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Reach Goals</h3>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Track daily progress against your custom fitness goals and chat
+              with NutriBot for personalized guidance.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section
+        id="features"
+        className="max-w-6xl mx-auto px-6 py-16 border-t border-slate-900"
+      >
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Smart Features Built For Your Fitness
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto">
+            Discover how NutriMorph leverages advanced AI to automate your
+            health tracking.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
+              <Camera className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">
+              AI Food Image Scanning
+            </h3>
+            <p className="text-sm text-slate-400">
+              Snap any meal and let Gemini Flash detect ingredients, calories,
+              and macros instantly.
+            </p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
+              <Bot className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">
+              NutriBot AI Coach
+            </h3>
+            <p className="text-sm text-slate-400">
+              Chat 24/7 with your personal AI nutritionist for customized diet
+              adjustments and tips.
+            </p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
               <PieChart className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-3">
-              Smart Macro Tracking
+            <h3 className="text-lg font-bold text-white mb-2">
+              Deep Macro Breakdown
             </h3>
-            <p className="text-slate-400 leading-relaxed text-sm">
-              Keep precise track of your daily proteins, carbs, fats, and
-              hydration targets with real-time analytics.
+            <p className="text-sm text-slate-400">
+              Track protein, carbs, fats, and water intake accurately with
+              interactive charts.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Functional Subscriptions / Plans Section */}
+      {/* Testimonials Section */}
       <section
-        id="pricing"
-        className="max-w-4xl mx-auto px-6 py-16 border-t border-slate-800"
+        id="testimonials"
+        className="max-w-6xl mx-auto px-6 py-20 border-t border-slate-900"
       >
-        <h2 className="text-2xl md:text-3xl font-bold text-center text-white mb-4">
-          Choose Your Plan
-        </h2>
-        <p className="text-slate-400 text-center mb-8 text-sm">
-          Start for free or upgrade to Pro for unlimited AI guidance.
-        </p>
-
-        {/* Interactive Billing Cycle Toggle */}
-        <div className="flex items-center justify-center space-x-4 mb-12">
-          <span
-            className={`text-sm font-medium ${!isYearly ? "text-white" : "text-slate-400"}`}
-          >
-            Monthly
+        <div className="text-center mb-16">
+          <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full">
+            Verified Play Store Reviews
           </span>
-          <button
-            onClick={() => setIsYearly(!isYearly)}
-            className="w-14 h-8 bg-slate-800 border border-slate-700 rounded-full p-1 transition relative"
-          >
-            <div
-              className={`w-6 h-6 bg-emerald-400 rounded-full transition transform ${isYearly ? "translate-x-6" : "translate-x-0"}`}
-            />
-          </button>
-          <span
-            className={`text-sm font-medium ${isYearly ? "text-white" : "text-slate-400"}`}
-          >
-            Yearly{" "}
-            <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
-              Save 20%
-            </span>
-          </span>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-3 mb-4">
+            Loved By Fitness Enthusiasts
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto text-sm md:text-base">
+            See what our active users have to say about their transformation
+            journey with NutriMorph.
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Free Tier */}
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between relative">
+            <Quote className="absolute top-6 right-6 w-8 h-8 text-emerald-500/10" />
+            <div>
+              <div className="flex space-x-1 text-amber-400 mb-4">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-amber-400" />
+                ))}
+              </div>
+              <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                &ldquo;The food scanning feature is an absolute game changer! It
+                accurately guesses macros within seconds. Saved me hours of
+                manual logging.&rdquo;
+              </p>
+            </div>
+            <div className="flex items-center space-x-3 border-t border-slate-800/80 pt-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center font-bold justify-center text-sm">
+                JD
+              </div>
+              <div>
+                <h4 className="text-white text-sm font-semibold">
+                  Jonathan Davis
+                </h4>
+                <p className="text-slate-500 text-xs">Google Play User</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between relative">
+            <Quote className="absolute top-6 right-6 w-8 h-8 text-emerald-500/10" />
+            <div>
+              <div className="flex space-x-1 text-amber-400 mb-4">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-amber-400" />
+                ))}
+              </div>
+              <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                &ldquo;NutriBot AI coach feels like having a real dietician in
+                my pocket. Whenever I feel stuck on my diet, it gives me instant
+                custom adjustments!&rdquo;
+              </p>
+            </div>
+            <div className="flex items-center space-x-3 border-t border-slate-800/80 pt-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center font-bold justify-center text-sm">
+                SM
+              </div>
+              <div>
+                <h4 className="text-white text-sm font-semibold">
+                  Sarah Miller
+                </h4>
+                <p className="text-slate-500 text-xs">Google Play User</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between relative">
+            <Quote className="absolute top-6 right-6 w-8 h-8 text-emerald-500/10" />
+            <div>
+              <div className="flex space-x-1 text-amber-400 mb-4">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-amber-400" />
+                ))}
+              </div>
+              <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                &ldquo;Clean UI, fast Stripe checkout, and zero lags. The pro
+                plan is totally worth every penny for anyone serious about
+                bodybuilding.&rdquo;
+              </p>
+            </div>
+            <div className="flex items-center space-x-3 border-t border-slate-800/80 pt-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center font-bold justify-center text-sm">
+                AK
+              </div>
+              <div>
+                <h4 className="text-white text-sm font-semibold">Alex Khan</h4>
+                <p className="text-slate-500 text-xs">Google Play User</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section
+        id="faq"
+        className="max-w-4xl mx-auto px-6 py-20 border-t border-slate-900"
+      >
+        <div className="text-center mb-16">
+          <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full">
+            Got Questions?
+          </span>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-3 mb-4">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto text-sm md:text-base">
+            Everything you need to know about billing, AI food analysis, and
+            account security.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(1)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>How accurate is the AI food image scanner?</span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 1 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 1 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                NutriMorph uses advanced Gemini 3.5 Flash AI, which achieves
+                over 95% accuracy in detecting food ingredients and estimating
+                standard portion sizes and macros.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(2)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>Can I cancel or change my subscription anytime?</span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 2 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 2 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                Yes, absolutely! You can manage, upgrade, or cancel your
+                subscription anytime directly through your billing portal or
+                Google Play account settings with no hidden cancellation fees.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(3)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>How do I delete my account and personal data?</span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 3 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 3 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                We respect your privacy completely. You can permanently delete
+                your account and all associated health logs instantly by
+                visiting our{" "}
+                <Link
+                  href="/delete-account"
+                  className="text-emerald-400 underline"
+                >
+                  Delete Account
+                </Link>{" "}
+                page.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(4)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>Is my personal health and meal data secure?</span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 4 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 4 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                Yes. All data transmitted between your mobile device and our
+                cloud servers is encrypted with industry-standard protocols,
+                ensuring complete security and confidentiality.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section
+        id="pricing"
+        className="max-w-5xl mx-auto px-6 py-16 border-t border-slate-900"
+      >
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Choose Your Plan
+          </h2>
+          <div className="inline-flex items-center space-x-4 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setIsYearly(false)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                !isYearly
+                  ? "bg-emerald-500 text-slate-950"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setIsYearly(true)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                isYearly
+                  ? "bg-emerald-500 text-slate-950"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Yearly (Save 20%)
+            </button>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between">
             <div>
-              <h3 className="text-lg font-bold text-white mb-2">
-                Free Starter
-              </h3>
-              <p className="text-3xl font-extrabold text-white mb-6">
-                $0{" "}
-                <span className="text-slate-500 text-sm font-normal">
-                  / forever
-                </span>
+              <h3 className="text-xl font-bold text-white mb-2">Free Plan</h3>
+              <p className="text-slate-400 text-sm mb-6">
+                Basic food logging and limited macro tracking.
               </p>
-              <ul className="space-y-3 text-sm text-slate-300 mb-8">
-                <li className="flex items-center space-x-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>5 free AI chat messages per day</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>Basic meal & macro logging</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>Water & goal tracking</span>
-                </li>
-              </ul>
+              <div className="text-3xl font-extrabold text-white mb-6">$0</div>
             </div>
             <button
-              onClick={() => handlePlanSelect("Free Starter Plan")}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl transition border border-slate-700"
+              onClick={() => handlePlanSelect("Free Plan")}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition"
             >
-              Get Free Plan
+              Get Started Free
             </button>
           </div>
 
-          {/* Pro Tier */}
-          <div className="bg-slate-900 border border-emerald-500/50 p-8 rounded-2xl flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-bl-lg">
-              POPULAR
-            </div>
+          <div className="bg-slate-900 border border-emerald-500/50 p-8 rounded-2xl flex flex-col justify-between relative shadow-lg shadow-emerald-500/10">
             <div>
-              <h3 className="text-lg font-bold text-white mb-2">
-                NutriMorph Pro
-              </h3>
-              <p className="text-3xl font-extrabold text-emerald-400 mb-6">
-                {isYearly ? "$79.99" : "$9.99"}{" "}
-                <span className="text-slate-500 text-sm font-normal">
-                  / {isYearly ? "year" : "month"}
-                </span>
+              <span className="absolute -top-3 right-6 bg-emerald-500 text-slate-950 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+                Popular
+              </span>
+              <h3 className="text-xl font-bold text-white mb-2">Pro Plan</h3>
+              <p className="text-slate-400 text-sm mb-6">
+                Advanced AI scanning & deep macro breakdown.
               </p>
-              <ul className="space-y-3 text-sm text-slate-300 mb-8">
-                <li className="flex items-center space-x-2">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Unlimited NutriBot AI messaging</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Unlimited AI photo meal scans</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Advanced dietary analytics & history</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Priority Gemini 3.5 Flash Lite responses</span>
-                </li>
-              </ul>
+              <div className="text-3xl font-extrabold text-white mb-6">
+                {isYearly ? "$99/yr" : "$9.99/mo"}
+              </div>
             </div>
             <button
-              onClick={() =>
-                handlePlanSelect(
-                  isYearly ? "Pro Yearly Plan" : "Pro Monthly Plan",
-                )
-              }
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-500/20"
+              onClick={() => handlePlanSelect("Pro Plan")}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition"
             >
-              Subscribe to Pro
+              Select Pro
             </button>
           </div>
         </div>
       </section>
 
-      {/* Subscription Checkout Action Modal */}
+      {/* Subscription Modal */}
       {showSubModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl relative shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl relative shadow-2xl">
             <button
               onClick={() => setShowSubModal(false)}
               className="absolute top-4 right-4 text-slate-400 hover:text-white"
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl w-fit mb-4">
-              <Smartphone className="w-6 h-6" />
-            </div>
+
             <h3 className="text-xl font-bold text-white mb-2">
-              Subscribe to {selectedPlan}
+              Confirm Subscription
             </h3>
-            <p className="text-slate-300 text-sm mb-6 leading-relaxed">
-              Enter your registered account email to proceed with secure web
-              checkout and sync your subscription with the NutriMorph app.
+            <p className="text-sm text-slate-400 mb-4">
+              Selected:{" "}
+              <span className="text-emerald-400 font-semibold">
+                {selectedPlan}
+              </span>{" "}
+              ({isYearly ? "Yearly" : "Monthly"})
             </p>
 
             <form onSubmit={handleSubscriptionCheckout} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Account Email
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Email Address
                 </label>
                 <input
                   type="email"
-                  required
-                  placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
+                  placeholder="name@example.com"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               {errorMessage && (
-                <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+                <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
                   {errorMessage}
-                </p>
+                </div>
               )}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl transition flex items-center justify-center space-x-2 disabled:opacity-50"
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition flex items-center justify-center space-x-2 disabled:opacity-50"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Processing Secure Checkout...</span>
-                  </>
-                ) : (
-                  <span>Proceed to Payment</span>
-                )}
+                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>
+                  {loading ? "Processing..." : "Proceed to Secure Checkout"}
+                </span>
               </button>
             </form>
           </div>
@@ -408,6 +692,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-slate-400">
           <p>© 2026 NutriMorph AI. All rights reserved.</p>
           <div className="flex flex-wrap items-center gap-6">
+            <Link href="/contact" className="hover:text-emerald-400 transition">
+              Support / Contact
+            </Link>
             <Link
               href="/privacy-policy"
               className="hover:text-emerald-400 transition"
@@ -415,11 +702,11 @@ export default function Home() {
               Privacy Policy
             </Link>
             <Link href="/terms" className="hover:text-emerald-400 transition">
-              Terms of Service
+              Terms & Conditions
             </Link>
             <Link
               href="/delete-account"
-              className="hover:text-emerald-400 transition"
+              className="text-red-400 hover:text-red-300 transition"
             >
               Delete Account
             </Link>
