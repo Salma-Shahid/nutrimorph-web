@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -126,7 +126,7 @@ export default function Home() {
           process.env.NEXT_PUBLIC_BACKEND_URL ||
           "https://nutrimorph-backend.vercel.app";
 
-        const response = await fetch(`${apiEndpoint}/api/user/update-plan`, {
+        const response = await fetch(`${apiEndpoint}/api/payment/update-plan`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
