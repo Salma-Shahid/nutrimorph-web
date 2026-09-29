@@ -64,6 +64,10 @@ export default function Home() {
     try {
       const token = localStorage.getItem("token");
 
+      if (!token) {
+        throw new Error("Not authorized. Please log in to your account first.");
+      }
+
       const response = await processBackendCheckout(
         {
           plan: selectedPlan,
