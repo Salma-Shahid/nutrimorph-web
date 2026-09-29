@@ -12,16 +12,87 @@ import {
   Smartphone,
   Check,
   X,
+  Loader2,
 } from "lucide-react";
 
 export default function Home() {
   const [isYearly, setIsYearly] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSubscribe = (planName: string) => {
+  // Handle plan selection and open subscription modal
+  const handlePlanSelect = (planName: string) => {
     setSelectedPlan(planName);
     setShowSubModal(true);
+    setErrorMessage("");
+  };
+
+  // Handle direct payment and backend integration for subscriptions
+  const handleSubscriptionCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setErrorMessage("Please enter your registered email address.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      // LocalStorage se user ka auth token retrieve karein (protect middleware ke liye)
+      const token = localStorage.getItem("token");
+
+      // API call to nutrimorph-backend payment endpoint
+      const response = await processBackendCheckout(
+        {
+          plan: selectedPlan,
+          billingCycle: isYearly ? "yearly" : "monthly",
+          email: email,
+          aiModel: "gemini-3.5-flash-lite",
+        },
+        token,
+      );
+
+      if (response.url) {
+        // Redirect user to secure Stripe payment gateway URL returned by backend
+        window.location.href = response.url;
+      } else {
+        throw new Error("Invalid payment gateway response.");
+      }
+    } catch (err: any) {
+      setErrorMessage(
+        err.message || "Failed to process payment. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Backend communication helper (Updated with correct payment endpoint & Auth header)
+  const processBackendCheckout = async (payload: any, token: string | null) => {
+    const apiEndpoint =
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      "https://nutrimorph-backend.onrender.com";
+
+    const res = await fetch(
+      `${apiEndpoint}/api/payment/create-checkout-session`, // Corrected route path matching backend
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}), // Pass token if available
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    const data = await res.json();
+    if (!res.ok)
+      throw new Error(data.message || "Backend payment processing failed");
+    return data;
   };
 
   return (
@@ -68,7 +139,7 @@ export default function Home() {
       <section className="max-w-5xl mx-auto px-6 pt-20 pb-16 text-center">
         <div className="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 px-4 py-1.5 rounded-full text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-8">
           <Zap className="w-4 h-4" />
-          <span>Powered by Gemini 3.5 AI</span>
+          <span>Powered by Gemini 3.5 Flash Lite AI</span>
         </div>
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight">
           Your Personal AI Nutritionist <br className="hidden md:inline" /> &
@@ -86,13 +157,20 @@ export default function Home() {
             <Smartphone className="w-5 h-5" />
             <span>View Plans & Subscribe</span>
           </a>
-          <Link
-            href="/privacy-policy"
-            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-8 py-4 rounded-xl transition border border-slate-700"
+          <a
+            href="https://play.google.com/store/apps/details?id=com.salmashahid.nutrimorph"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto inline-flex items-center justify-center space-x-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold px-8 py-4 rounded-xl transition border border-slate-700 shadow-xl"
           >
-            <span>Read Privacy Policy</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+            <svg
+              className="w-5 h-5 fill-current text-emerald-400"
+              viewBox="0 0 24 24"
+            >
+              <path d="M3.609 1.814L13.792 12 3.61 22.186a1.5 1.5 0 0 1-.61-1.21V3.024a1.5 1.5 0 0 1 .609-1.21zM15.208 13.416l2.122 2.122-11.233 6.49a1.5 1.5 0 0 1-1.498 0l10.609-8.612zm0-2.832L4.599 1.972a1.5 1.5 0 0 1 1.498 0l11.233 6.49-2.122 2.122zm1.414 1.414l3.536 2.042a1.25 1.25 0 0 1 0 2.164l-3.536 2.042-2.122-2.122 2.122-2.126z" />
+            </svg>
+            <span>Download on Google Play</span>
+          </a>
         </div>
       </section>
 
@@ -167,9 +245,7 @@ export default function Home() {
             className="w-14 h-8 bg-slate-800 border border-slate-700 rounded-full p-1 transition relative"
           >
             <div
-              className={`w-6 h-6 bg-emerald-400 rounded-full transition transform ${
-                isYearly ? "translate-x-6" : "translate-x-0"
-              }`}
+              className={`w-6 h-6 bg-emerald-400 rounded-full transition transform ${isYearly ? "translate-x-6" : "translate-x-0"}`}
             />
           </button>
           <span
@@ -211,7 +287,7 @@ export default function Home() {
               </ul>
             </div>
             <button
-              onClick={() => handleSubscribe("Free Tier")}
+              onClick={() => handlePlanSelect("Free Starter Plan")}
               className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl transition border border-slate-700"
             >
               Get Free Plan
@@ -248,12 +324,16 @@ export default function Home() {
                 </li>
                 <li className="flex items-center space-x-2">
                   <Check className="w-4 h-4 text-emerald-400" />
-                  <span>Priority Gemini 3.5 Flash responses</span>
+                  <span>Priority Gemini 3.5 Flash Lite responses</span>
                 </li>
               </ul>
             </div>
             <button
-              onClick={() => handleSubscribe("Pro Plan")}
+              onClick={() =>
+                handlePlanSelect(
+                  isYearly ? "Pro Yearly Plan" : "Pro Monthly Plan",
+                )
+              }
               className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-500/20"
             >
               Subscribe to Pro
@@ -262,7 +342,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Subscription Action Modal */}
+      {/* Subscription Checkout Action Modal */}
       {showSubModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 max-w-md w-full p-6 rounded-2xl relative shadow-2xl">
@@ -276,27 +356,49 @@ export default function Home() {
               <Smartphone className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">
-              Complete in NutriMorph App
+              Subscribe to {selectedPlan}
             </h3>
             <p className="text-slate-300 text-sm mb-6 leading-relaxed">
-              Subscriptions for <strong>{selectedPlan}</strong> are managed
-              securely through Google Play Store Billing inside the NutriMorph
-              mobile application.
+              Enter your registered account email to proceed with secure web
+              checkout and sync your subscription with the NutriMorph app.
             </p>
-            <div className="space-y-3">
+
+            <form onSubmit={handleSubscriptionCheckout} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Account Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
+                />
+              </div>
+
+              {errorMessage && (
+                <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+                  {errorMessage}
+                </p>
+              )}
+
               <button
-                onClick={() => alert("Redirecting to Google Play Store...")}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition"
+                type="submit"
+                disabled={loading}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl transition flex items-center justify-center space-x-2 disabled:opacity-50"
               >
-                Download on Google Play
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Processing Secure Checkout...</span>
+                  </>
+                ) : (
+                  <span>Proceed to Payment</span>
+                )}
               </button>
-              <button
-                onClick={() => setShowSubModal(false)}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-3 rounded-xl transition"
-              >
-                Close
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
