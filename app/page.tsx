@@ -102,7 +102,7 @@ export default function Home() {
   ): Promise<CheckoutResponse> => {
     const apiEndpoint =
       process.env.NEXT_PUBLIC_BACKEND_URL ||
-      "https://nutrimorph-backend.onrender.com";
+      "https://nutrimorph-backend.vercel.app";
 
     const res = await fetch(
       `${apiEndpoint}/api/payment/create-checkout-session`,
