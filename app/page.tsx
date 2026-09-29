@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Zap,
   Smartphone,
@@ -35,6 +36,7 @@ interface CheckoutResponse {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [isYearly, setIsYearly] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -46,14 +48,14 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [loginErrorMessage, setLoginErrorMessage] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      setIsLoggedIn(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    // Initial state mein hi localStorage check kar lein (no useEffect warning needed!)
+    if (typeof window !== "undefined") {
+      return !!localStorage.getItem("token");
     }
-  }, []);
+    return false;
+  });
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -107,7 +109,8 @@ export default function Home() {
     setOpenFaq(openFaq === index ? null : index);
   };
 
-  const handlePlanSelect = (planName: string) => {
+  // Handle Plan Selection (Free vs Pro)
+  const handlePlanSelect = async (planName: string) => {
     const token = localStorage.getItem("token");
     if (!token) {
       alert("Please log in to your account first.");
@@ -115,66 +118,56 @@ export default function Home() {
       return;
     }
 
-    // Bypass payment modal for Free Plan
+    // Handle Free Plan selection by updating the backend database directly
     if (planName === "Free Plan") {
-      alert("Free Plan selected successfully!");
+      try {
+        setLoading(true);
+        const apiEndpoint =
+          process.env.NEXT_PUBLIC_BACKEND_URL ||
+          "https://nutrimorph-backend.vercel.app";
+
+        const response = await fetch(`${apiEndpoint}/api/user/update-plan`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            plan: "Free",
+            aiModel: "gemini-3.5-flash-lite",
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to update subscription plan.",
+          );
+        }
+
+        alert("Free Plan activated successfully! Database updated.");
+        // Redirect to dashboard using Next.js router
+        router.push("/dashboard");
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          alert(err.message);
+        } else {
+          alert("An unexpected error occurred while updating the plan.");
+        }
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
+    // Pro Plan flow continues to Stripe Checkout modal
     setSelectedPlan(planName);
     setShowSubModal(true);
     setErrorMessage("");
   };
 
-  const handleSubscriptionCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      setErrorMessage("Please enter your registered email address.");
-      return;
-    }
-
-    setLoading(true);
-    setErrorMessage("");
-
-    try {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        throw new Error("Not authorized. Please log in to your account first.");
-      }
-
-      const response = await processBackendCheckout(
-        {
-          plan: selectedPlan,
-          billingCycle: isYearly ? "yearly" : "monthly",
-          email: email,
-          aiModel: "gemini-3.5-flash-lite",
-        },
-        token,
-      );
-
-      if (response.url) {
-        window.location.assign(response.url);
-      } else {
-        throw new Error("Invalid payment gateway response.");
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        if (err.message.includes("Failed to fetch")) {
-          setErrorMessage(
-            "Backend is waking up or unreachable. Please try again in 30 seconds.",
-          );
-        } else {
-          setErrorMessage(err.message);
-        }
-      } else {
-        setErrorMessage("Failed to process payment. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Helper function for Pro Plan Checkout (Ab yeh handleSubscriptionCheckout ke andar use hoga)
   const processBackendCheckout = async (
     payload: CheckoutPayload,
     token: string | null,
@@ -199,6 +192,55 @@ export default function Home() {
     if (!res.ok)
       throw new Error(data.message || "Backend payment processing failed");
     return data;
+  };
+  // Main Checkout Handler
+  const handleSubscriptionCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setErrorMessage("Please enter your registered email address.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Not authorized. Please log in to your account first.");
+      }
+
+      // Yahan helper function ko call kiya gaya hai (unused error fix)
+      const data = await processBackendCheckout(
+        {
+          plan: selectedPlan,
+          billingCycle: isYearly ? "yearly" : "monthly",
+          email: email,
+          aiModel: "gemini-3.5-flash-lite",
+        },
+        token,
+      );
+
+      if (data.url) {
+        window.location.assign(data.url);
+      } else {
+        throw new Error("Invalid payment gateway response.");
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message.includes("Failed to fetch")) {
+          setErrorMessage(
+            "Backend is waking up or unreachable. Please try again in 30 seconds.",
+          );
+        } else {
+          setErrorMessage(err.message);
+        }
+      } else {
+        setErrorMessage("Failed to process payment. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -764,6 +806,13 @@ export default function Home() {
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
+
+              {/* Hidden configuration info for Gemini AI tier tracking */}
+              <input
+                type="hidden"
+                name="aiModel"
+                value="gemini-3.5-flash-lite"
+              />
 
               {errorMessage && (
                 <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
