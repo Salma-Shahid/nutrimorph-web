@@ -115,6 +115,12 @@ export default function Home() {
       return;
     }
 
+    // Bypass payment modal for Free Plan
+    if (planName === "Free Plan") {
+      alert("Free Plan selected successfully!");
+      return;
+    }
+
     setSelectedPlan(planName);
     setShowSubModal(true);
     setErrorMessage("");
@@ -536,7 +542,9 @@ export default function Home() {
                 AK
               </div>
               <div>
-                <h4 className="text-white text-sm font-semibold">Alex Khan</h4>
+                <h4 className="text-white text-sm font-semibold">
+                  Alex Walker
+                </h4>
                 <p className="text-slate-500 text-xs">Google Play User</p>
               </div>
             </div>
