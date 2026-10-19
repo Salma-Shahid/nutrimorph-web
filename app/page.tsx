@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import {
   Camera,
   Bot,
@@ -19,8 +18,8 @@ import {
   Star,
   Mail,
   ShieldAlert,
-  LogOut,
   LogIn,
+  LogOut,
   X,
   Loader2,
 } from "lucide-react";
@@ -202,11 +201,6 @@ export default function Home() {
     }
 
     if (planName === "Free Plan") {
-      if (currentPlan.toLowerCase() === "free") {
-        alert("You are currently using the Free Plan.");
-        return;
-      }
-
       try {
         setLoading(true);
         const apiEndpoint =
@@ -225,26 +219,18 @@ export default function Home() {
           }),
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message || "Failed to update subscription plan.",
-          );
+        if (response.ok) {
+          localStorage.setItem("userPlan", "Free");
+          setCurrentPlan("Free");
+          alert("Plan successfully changed to Free!");
+          window.location.reload();
         }
-
-        alert("Plan changed to Free Plan successfully!");
-        setCurrentPlan("Free");
-        localStorage.setItem("userPlan", "Free");
-        window.location.reload();
       } catch (err: unknown) {
         if (err instanceof Error) {
-          alert(err.message);
+          alert("Plan sync error: " + err.message);
         } else {
-          alert("An unexpected error occurred while updating the plan.");
+          alert("Plan sync error: An unknown error occurred.");
         }
-      } finally {
-        setLoading(false);
       }
       return;
     }
@@ -333,6 +319,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
       {/* Header / Navbar */}
+      {/* Header / Navbar */}
       <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center space-x-2 shrink-0">
@@ -403,20 +390,31 @@ export default function Home() {
 
           <div className="flex items-center space-x-2 shrink-0">
             {isLoggedIn ? (
-              <div className="flex items-center space-x-1.5 bg-slate-950/80 border border-slate-800 px-2.5 py-1 rounded-xl text-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-                <span className="text-slate-300 font-medium truncate max-w-28 sm:max-w-36">
-                  {email || "User"}
-                </span>
-                <span
-                  className={`px-1.5 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${
-                    currentPlan.toLowerCase() === "pro"
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : "bg-slate-800 text-slate-400 border border-slate-700"
-                  }`}
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1.5 bg-slate-950/80 border border-slate-800 px-2.5 py-1 rounded-xl text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                  <span className="text-slate-300 font-medium truncate max-w-28 sm:max-w-36">
+                    {email || "User"}
+                  </span>
+                  <span
+                    className={`px-1.5 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${
+                      currentPlan.toLowerCase() === "pro"
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        : "bg-slate-800 text-slate-400 border border-slate-700"
+                    }`}
+                  >
+                    {currentPlan}
+                  </span>
+                </div>
+
+                {/* 👉 Logout Button Added Here */}
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-xl transition flex items-center space-x-1 text-xs font-semibold"
                 >
-                  {currentPlan}
-                </span>
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
               </div>
             ) : (
               <button
