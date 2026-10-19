@@ -22,6 +22,7 @@ import {
   LogOut,
   LogIn,
   X,
+  Loader2,
 } from "lucide-react";
 
 interface CheckoutPayload {
