@@ -9,6 +9,7 @@ import {
   X,
   Loader2,
   ShieldAlert,
+  Globe,
   Camera,
   Bot,
   PieChart,
@@ -452,7 +453,7 @@ export default function Home() {
             health tracking.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
             <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
               <Camera className="w-6 h-6" />
@@ -461,10 +462,11 @@ export default function Home() {
               AI Food Image Scanning
             </h3>
             <p className="text-sm text-slate-400">
-              Snap any meal and let Gemini Flash detect ingredients, calories,
-              and macros instantly.
+              Snap any meal and let Gemini Flash AI detect ingredients,
+              calories, and macros instantly.
             </p>
           </div>
+
           <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
             <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
               <Bot className="w-6 h-6" />
@@ -477,6 +479,7 @@ export default function Home() {
               adjustments and tips.
             </p>
           </div>
+
           <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
             <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
               <PieChart className="w-6 h-6" />
@@ -486,7 +489,20 @@ export default function Home() {
             </h3>
             <p className="text-sm text-slate-400">
               Track protein, carbs, fats, and water intake accurately with
-              interactive charts.
+              interactive progress metrics.
+            </p>
+          </div>
+
+          <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 mb-4">
+              <Globe className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">
+              Multilingual & Local Foods
+            </h3>
+            <p className="text-sm text-slate-400">
+              Accurately recognizes international & regional meals (including
+              Desi & home-cooked dishes).
             </p>
           </div>
         </div>
@@ -607,8 +623,8 @@ export default function Home() {
             Frequently Asked Questions
           </h2>
           <p className="text-slate-400 max-w-xl mx-auto text-sm md:text-base">
-            Everything you need to know about billing, AI food analysis, and
-            account security.
+            Everything you need to know about billing, AI food analysis,
+            regional dish recognition, and account security.
           </p>
         </div>
 
@@ -637,12 +653,72 @@ export default function Home() {
               onClick={() => toggleFaq(2)}
               className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
             >
-              <span>Can I cancel or change my subscription anytime?</span>
+              <span>
+                Does NutriMorph recognize regional and home-cooked dishes?
+              </span>
               <ChevronDown
                 className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 2 ? "rotate-180 text-emerald-400" : ""}`}
               />
             </button>
             {openFaq === 2 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                Yes! Unlike traditional Western diet apps, NutriMorph’s AI
+                vision model is optimized to recognize a wide variety of
+                regional, South Asian, and international home-cooked meals
+                accurately.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(3)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>Is NutriMorph available in multiple languages?</span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 3 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 3 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                Yes, NutriMorph is built to support a global audience with
+                multilingual features (including English and Urdu) for seamless
+                meal logging and AI coaching.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(4)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>What is included in the Free vs Pro Plan?</span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 4 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 4 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                The Free plan provides basic meal logging and calorie tracking.
+                The Pro plan unlocks unlimited AI food photo scans, deep macro
+                breakdowns, and 24/7 personal guidance from NutriBot AI Coach.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(5)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>Can I cancel or change my subscription anytime?</span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 5 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 5 && (
               <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
                 Yes, absolutely! You can manage, upgrade, or cancel your
                 subscription anytime directly through your billing portal or
@@ -653,15 +729,15 @@ export default function Home() {
 
           <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
             <button
-              onClick={() => toggleFaq(3)}
+              onClick={() => toggleFaq(6)}
               className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
             >
               <span>How do I delete my account and personal data?</span>
               <ChevronDown
-                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 3 ? "rotate-180 text-emerald-400" : ""}`}
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 6 ? "rotate-180 text-emerald-400" : ""}`}
               />
             </button>
-            {openFaq === 3 && (
+            {openFaq === 6 && (
               <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
                 We respect your privacy completely. You can permanently delete
                 your account and all associated health logs instantly by
@@ -679,15 +755,15 @@ export default function Home() {
 
           <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
             <button
-              onClick={() => toggleFaq(4)}
+              onClick={() => toggleFaq(7)}
               className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
             >
               <span>Is my personal health and meal data secure?</span>
               <ChevronDown
-                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 4 ? "rotate-180 text-emerald-400" : ""}`}
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 7 ? "rotate-180 text-emerald-400" : ""}`}
               />
             </button>
-            {openFaq === 4 && (
+            {openFaq === 7 && (
               <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
                 Yes. All data transmitted between your mobile device and our
                 cloud servers is encrypted with industry-standard protocols,
