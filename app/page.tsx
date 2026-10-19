@@ -367,6 +367,12 @@ export default function Home() {
               Plans
             </Link>
             <Link
+              href="/blog"
+              className="hover:text-emerald-400 transition whitespace-nowrap"
+            >
+              Blog
+            </Link>
+            <Link
               href="/contact"
               className="hover:text-emerald-400 transition flex items-center space-x-1 whitespace-nowrap"
             >
