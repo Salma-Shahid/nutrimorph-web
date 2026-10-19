@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,7 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [loginErrorMessage, setLoginErrorMessage] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<string>("Free");
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     // Initial state mein hi localStorage check kar lein (no useEffect warning needed!)
@@ -57,6 +58,38 @@ export default function Home() {
     }
     return false;
   });
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      try {
+        const apiEndpoint =
+          process.env.NEXT_PUBLIC_BACKEND_URL ||
+          "https://nutrimorph-backend.vercel.app";
+
+        const res = await fetch(`${apiEndpoint}/api/auth/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const userPlan = data?.user?.subscriptionPlan || data?.plan || "Free";
+          setCurrentPlan(userPlan);
+          if (data?.user?.email) setEmail(data.user.email);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user subscription status", err);
+      }
+    };
+
+    if (isLoggedIn) {
+      fetchUserProfile();
+    }
+  }, [isLoggedIn]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -261,6 +294,7 @@ export default function Home() {
               Nutri<span className="text-emerald-400">Morph</span>
             </span>
           </Link>
+
           <nav className="hidden md:flex items-center space-x-6 text-sm text-slate-300 font-medium">
             <Link
               href="#how-it-works"
@@ -308,17 +342,37 @@ export default function Home() {
             </Link>
 
             {isLoggedIn ? (
-              <button
-                onClick={handleLogout}
-                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-xl transition flex items-center space-x-1"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
-              </button>
+              <div className="flex items-center space-x-3">
+                {/* User Identity & Active Plan Badge */}
+                <div className="flex items-center space-x-2 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-slate-300 font-medium truncate max-w-28 md:max-w-36">
+                    {email || "User"}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
+                      currentPlan.toLowerCase() === "pro"
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        : "bg-slate-800 text-slate-400 border border-slate-700"
+                    }`}
+                  >
+                    {currentPlan}
+                  </span>
+                </div>
+
+                {/* Logout Button */}
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-xl transition flex items-center space-x-1 text-xs font-semibold"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl transition flex items-center space-x-1"
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl transition flex items-center space-x-1 text-xs"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Login</span>
