@@ -77,9 +77,16 @@ export default function Home() {
 
         if (res.ok) {
           const data = await res.json();
-          const userPlan = data?.user?.subscriptionPlan || data?.plan || "Free";
+          // Check user object or root level response
+          const userObj = data?.user || data;
+
+          const userPlan = userObj?.subscriptionPlan || userObj?.plan || "Free";
+          const userEmail = userObj?.email || userObj?.name || "";
+
           setCurrentPlan(userPlan);
-          if (data?.user?.email) setEmail(data.user.email);
+          if (userEmail) {
+            setEmail(userEmail);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch user subscription status", err);
@@ -122,9 +129,24 @@ export default function Home() {
       if (token) {
         localStorage.setItem("token", token);
         setIsLoggedIn(true);
+
+        // 👉 User email ya name ko set karne ke liye code
+        const loggedInEmail = data?.user?.email || data?.email || email;
+        if (loggedInEmail) {
+          setEmail(loggedInEmail);
+        }
+
+        // Agar backend se user ka current plan bhi mil jaye toh use set kar lein
+        const userPlan = data?.user?.subscriptionPlan || data?.plan;
+        if (userPlan) {
+          setCurrentPlan(userPlan);
+        }
+
         setShowLoginModal(false);
         setPassword("");
-        alert("Login successful!");
+
+        // Page reload ya state sync ke liye
+        window.location.reload();
       } else {
         throw new Error("Token not received from server.");
       }
