@@ -1,27 +1,27 @@
 "use client";
-import React, { useEffect, useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Zap,
-  Smartphone,
-  X,
-  Loader2,
-  ShieldAlert,
-  Globe,
   Camera,
   Bot,
   PieChart,
+  Globe,
+  ChevronDown,
+  Zap,
   Download,
+  Smartphone,
   Sparkles,
   CheckCircle2,
-  Star,
   Quote,
-  ChevronDown,
+  Star,
   Mail,
-  LogIn,
+  ShieldAlert,
   LogOut,
+  LogIn,
+  X,
 } from "lucide-react";
 
 interface CheckoutPayload {
@@ -42,17 +42,26 @@ export default function Home() {
   const [showSubModal, setShowSubModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("userEmail") || "";
+    }
+    return "";
+  });
+  const [currentPlan, setCurrentPlan] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("userPlan") || "Free";
+    }
+    return "Free";
+  });
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [loginErrorMessage, setLoginErrorMessage] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [currentPlan, setCurrentPlan] = useState<string>("Free");
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    // Initial state mein hi localStorage check kar lein (no useEffect warning needed!)
     if (typeof window !== "undefined") {
       return !!localStorage.getItem("token");
     }
@@ -80,12 +89,19 @@ export default function Home() {
           // Check user object or root level response
           const userObj = data?.user || data;
 
-          const userPlan = userObj?.subscriptionPlan || userObj?.plan || "Free";
+          const userPlan =
+            userObj?.subscriptionPlan ||
+            userObj?.plan ||
+            userObj?.tier ||
+            "Free";
           const userEmail = userObj?.email || userObj?.name || "";
 
           setCurrentPlan(userPlan);
+          localStorage.setItem("userPlan", userPlan);
+
           if (userEmail) {
             setEmail(userEmail);
+            localStorage.setItem("userEmail", userEmail);
           }
         }
       } catch (err) {
@@ -100,7 +116,11 @@ export default function Home() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userPlan");
     setIsLoggedIn(false);
+    setEmail("");
+    setCurrentPlan("Free");
     window.location.reload();
   };
 
@@ -130,22 +150,24 @@ export default function Home() {
         localStorage.setItem("token", token);
         setIsLoggedIn(true);
 
-        // 👉 User email ya name ko set karne ke liye code
         const loggedInEmail = data?.user?.email || data?.email || email;
+        const loggedInPlan =
+          data?.user?.subscriptionPlan ||
+          data?.user?.plan ||
+          data?.plan ||
+          "Free";
+
         if (loggedInEmail) {
           setEmail(loggedInEmail);
+          localStorage.setItem("userEmail", loggedInEmail);
         }
-
-        // Agar backend se user ka current plan bhi mil jaye toh use set kar lein
-        const userPlan = data?.user?.subscriptionPlan || data?.plan;
-        if (userPlan) {
-          setCurrentPlan(userPlan);
+        if (loggedInPlan) {
+          setCurrentPlan(loggedInPlan);
+          localStorage.setItem("userPlan", loggedInPlan);
         }
 
         setShowLoginModal(false);
         setPassword("");
-
-        // Page reload ya state sync ke liye
         window.location.reload();
       } else {
         throw new Error("Token not received from server.");
@@ -174,8 +196,17 @@ export default function Home() {
       return;
     }
 
-    // Handle Free Plan selection by updating the backend database directly
+    if (planName === "Pro Plan" && currentPlan.toLowerCase() === "pro") {
+      alert("You are already subscribed to the Pro Plan!");
+      return;
+    }
+
     if (planName === "Free Plan") {
+      if (currentPlan.toLowerCase() === "free") {
+        alert("You are currently using the Free Plan.");
+        return;
+      }
+
       try {
         setLoading(true);
         const apiEndpoint =
@@ -202,9 +233,10 @@ export default function Home() {
           );
         }
 
-        alert("Free Plan activated successfully! Database updated.");
-        // Redirect to dashboard using Next.js router
-        router.push("/dashboard");
+        alert("Plan changed to Free Plan successfully!");
+        setCurrentPlan("Free");
+        localStorage.setItem("userPlan", "Free");
+        window.location.reload();
       } catch (err: unknown) {
         if (err instanceof Error) {
           alert(err.message);
@@ -217,7 +249,6 @@ export default function Home() {
       return;
     }
 
-    // Pro Plan flow continues to Stripe Checkout modal
     setSelectedPlan(planName);
     setShowSubModal(true);
     setErrorMessage("");
