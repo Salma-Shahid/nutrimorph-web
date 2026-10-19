@@ -12,7 +12,7 @@ const blogPosts = [
     date: "October 18, 2026",
     readTime: "7 min read",
     category: "AI & Technology",
-    image: "/Ai-Powered.png",
+    image: "/AI-Powered.png", // 👈 Make sure casing matches public/AI-Powered.png exactly
   },
   {
     id: "calorie-deficit-guide",
@@ -32,7 +32,7 @@ const blogPosts = [
     date: "October 10, 2026",
     readTime: "6 min read",
     category: "Health & Fitness",
-    image: "/muscles-growth.png",
+    image: "/muscles-growth.png", // 👈 Ensure filename matches public folder (muscles-growth.png)
   },
 ];
 
@@ -83,12 +83,12 @@ export default function BlogPage() {
             >
               <div>
                 {/* Image Box */}
-                <div className="h-48 bg-slate-800/80 flex items-center justify-center relative overflow-hidden group-hover:scale-105 transition duration-500">
+                <div className="h-48 bg-slate-800 relative overflow-hidden">
                   <Image
                     src={post.image}
                     alt={post.title}
                     fill
-                    className="object-cover opacity-90"
+                    className="object-cover group-hover:scale-105 transition duration-500"
                   />
                   <span className="absolute top-3 left-3 bg-slate-950/80 text-emerald-400 border border-slate-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider z-10">
                     {post.category}
