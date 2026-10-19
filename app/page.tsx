@@ -38,7 +38,6 @@ interface CheckoutResponse {
 }
 
 export default function Home() {
-  const router = useRouter();
   const [isYearly, setIsYearly] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -334,105 +333,101 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
       {/* Header / Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3">
+      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <Link href="/" className="flex items-center space-x-2 shrink-0">
             <Image
               src="/logo.png"
               alt="NutriMorph Logo"
-              width={40}
-              height={40}
-              className="w-10 h-10 object-contain rounded-lg"
+              width={36}
+              height={36}
+              className="w-9 h-9 object-contain rounded-lg"
             />
-            <span className="text-xl font-bold tracking-tight text-white">
+            <span className="text-lg font-bold tracking-tight text-white">
               Nutri<span className="text-emerald-400">Morph</span>
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center space-x-6 text-sm text-slate-300 font-medium">
+          <nav className="hidden lg:flex items-center space-x-4 text-xs text-slate-300 font-medium shrink-0">
             <Link
               href="#how-it-works"
-              className="hover:text-emerald-400 transition"
+              className="hover:text-emerald-400 transition whitespace-nowrap"
             >
               How It Works
             </Link>
             <Link
               href="#features"
-              className="hover:text-emerald-400 transition"
+              className="hover:text-emerald-400 transition whitespace-nowrap"
             >
               Features
             </Link>
             <Link
               href="#testimonials"
-              className="hover:text-emerald-400 transition"
+              className="hover:text-emerald-400 transition whitespace-nowrap"
             >
               Reviews
             </Link>
-            <Link href="#faq" className="hover:text-emerald-400 transition">
+            <Link
+              href="#faq"
+              className="hover:text-emerald-400 transition whitespace-nowrap"
+            >
               FAQ
             </Link>
-            <Link href="#pricing" className="hover:text-emerald-400 transition">
+            <Link
+              href="#pricing"
+              className="hover:text-emerald-400 transition whitespace-nowrap"
+            >
               Plans
             </Link>
             <Link
               href="/contact"
-              className="hover:text-emerald-400 transition flex items-center space-x-1"
+              className="hover:text-emerald-400 transition flex items-center space-x-1 whitespace-nowrap"
             >
-              <Mail className="w-4 h-4" />
+              <Mail className="w-3.5 h-3.5" />
               <span>Support</span>
             </Link>
             <Link
               href="/privacy-policy"
-              className="hover:text-emerald-400 transition"
+              className="hover:text-emerald-400 transition whitespace-nowrap"
             >
               Privacy
             </Link>
             <Link
               href="/delete-account"
-              className="text-red-400 hover:text-red-300 transition flex items-center space-x-1"
+              className="text-red-400 hover:text-red-300 transition flex items-center space-x-1 whitespace-nowrap"
             >
-              <ShieldAlert className="w-4 h-4" />
+              <ShieldAlert className="w-3.5 h-3.5" />
               <span>Delete Account</span>
             </Link>
+          </nav>
 
+          <div className="flex items-center space-x-2 shrink-0">
             {isLoggedIn ? (
-              <div className="flex items-center space-x-3">
-                {/* User Identity & Active Plan Badge */}
-                <div className="flex items-center space-x-2 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-slate-300 font-medium truncate max-w-28 md:max-w-36">
-                    {email || "User"}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
-                      currentPlan.toLowerCase() === "pro"
-                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                        : "bg-slate-800 text-slate-400 border border-slate-700"
-                    }`}
-                  >
-                    {currentPlan}
-                  </span>
-                </div>
-
-                {/* Logout Button */}
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-xl transition flex items-center space-x-1 text-xs font-semibold"
+              <div className="flex items-center space-x-1.5 bg-slate-950/80 border border-slate-800 px-2.5 py-1 rounded-xl text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                <span className="text-slate-300 font-medium truncate max-w-28 sm:max-w-36">
+                  {email || "User"}
+                </span>
+                <span
+                  className={`px-1.5 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${
+                    currentPlan.toLowerCase() === "pro"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-slate-800 text-slate-400 border border-slate-700"
+                  }`}
                 >
-                  <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
-                </button>
+                  {currentPlan}
+                </span>
               </div>
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl transition flex items-center space-x-1 text-xs"
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3.5 py-1.5 rounded-xl transition flex items-center space-x-1 text-xs"
               >
-                <LogIn className="w-4 h-4" />
+                <LogIn className="w-3.5 h-3.5" />
                 <span>Login</span>
               </button>
             )}
-          </nav>
+          </div>
         </div>
       </header>
 
