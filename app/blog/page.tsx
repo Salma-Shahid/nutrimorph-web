@@ -3,37 +3,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { Calendar, Clock, ArrowLeft, Sparkles } from "lucide-react";
 
-// Sample blog posts data (Aap ise baad mein backend ya CMS se bhi connect kar sakti hain)
 const blogPosts = [
   {
-    id: 1,
+    id: "ai-macro-tracking",
     title: "How AI-Powered Macro Tracking is Revolutionizing Fitness in 2026",
     excerpt:
       "Discover how advanced computer vision and Google Gemini AI are making food logging faster and more accurate than ever before.",
     date: "October 18, 2026",
-    readTime: "4 min read",
+    readTime: "7 min read",
     category: "AI & Technology",
-    image: "/logo.png", // Aap yahan koi bhi appropriate image path de sakti hain
+    image: "/Ai-Powered.png",
   },
   {
-    id: 2,
+    id: "calorie-deficit-guide",
     title: "The Ultimate Guide to Calorie Deficit & Sustainable Fat Loss",
     excerpt:
       "Learn how to calculate your TDEE, set realistic macro goals, and drop body fat without starving yourself or cutting out your favorite foods.",
     date: "October 15, 2026",
-    readTime: "6 min read",
+    readTime: "9 min read",
     category: "Nutrition",
-    image: "/logo.png",
+    image: "/ultimate-guide.png",
   },
   {
-    id: 3,
+    id: "hydration-and-muscle-growth",
     title: "Why Hydration is the Missing Link in Your Muscle Growth Routine",
     excerpt:
       "Water intake isn't just about thirst—it plays a vital role in cellular volumization, nutrient transport, and overall workout performance.",
     date: "October 10, 2026",
-    readTime: "3 min read",
+    readTime: "6 min read",
     category: "Health & Fitness",
-    image: "/logo.png",
+    image: "/muscles-growth.png",
   },
 ];
 
@@ -77,21 +76,21 @@ export default function BlogPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-24">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {blogPosts.map((post) => (
-            <article
+            <Link
               key={post.id}
+              href={`/blog/${post.id}`}
               className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden hover:border-emerald-500/50 transition duration-300 flex flex-col justify-between group"
             >
               <div>
-                {/* Image Placeholder Box */}
+                {/* Image Box */}
                 <div className="h-48 bg-slate-800/80 flex items-center justify-center relative overflow-hidden group-hover:scale-105 transition duration-500">
                   <Image
                     src={post.image}
                     alt={post.title}
-                    width={60}
-                    height={60}
-                    className="object-contain opacity-80"
+                    fill
+                    className="object-cover opacity-90"
                   />
-                  <span className="absolute top-3 left-3 bg-slate-950/80 text-emerald-400 border border-slate-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  <span className="absolute top-3 left-3 bg-slate-950/80 text-emerald-400 border border-slate-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider z-10">
                     {post.category}
                   </span>
                 </div>
@@ -124,7 +123,7 @@ export default function BlogPage() {
                   <span>Read Article</span> &rarr;
                 </span>
               </div>
-            </article>
+            </Link>
           ))}
         </div>
       </section>
