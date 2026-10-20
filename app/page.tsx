@@ -113,6 +113,25 @@ export default function Home() {
     }
   }, [isLoggedIn]);
 
+  // 🌟 Payment Success Handle karne ke liye naya useEffect
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const paymentStatus = queryParams.get("payment");
+
+    if (paymentStatus === "success") {
+      alert("🎉 Payment Successful! Your Pro Plan is now active.");
+
+      // LocalStorage update karein
+      localStorage.setItem("userPlan", "pro");
+
+      // URL se query parameters saaf kar dein
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // Page reload karein taake backend se fresh Pro status load ho jaye
+      window.location.reload();
+    }
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("userEmail");
