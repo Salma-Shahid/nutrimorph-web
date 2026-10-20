@@ -89,10 +89,11 @@ export default function Home() {
           const userObj = data?.user || data;
 
           const userPlan =
+            userObj?.subscriptionTier ||
             userObj?.subscriptionPlan ||
             userObj?.plan ||
             userObj?.tier ||
-            "Free";
+            (userObj?.isPro ? "pro" : "Free");
           const userEmail = userObj?.email || userObj?.name || "";
 
           setCurrentPlan(userPlan);
