@@ -50,7 +50,7 @@ Ensure you configure `.env` files across your services before launching:
 ### Mobile App (`/nutrimorph/.env`)
 
 env
-EXPO_PUBLIC_API_URL=[https://nutrimorph-backend.vercel.app](https://nutrimorph-backend.vercel.app)
+EXPO_PUBLIC_API_URL=[https://api.nutrimorph.app](https://api.nutrimorph.app)
 EXPO_PUBLIC_REVENUECAT_KEY=your_revenuecat_api_key
 
 Backend API (/nutrimorph-backend/.env)

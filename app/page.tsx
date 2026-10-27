@@ -74,8 +74,7 @@ export default function Home() {
 
       try {
         const apiEndpoint =
-          process.env.NEXT_PUBLIC_BACKEND_URL ||
-          "https://nutrimorph-backend.vercel.app";
+          process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
 
         const res = await fetch(`${apiEndpoint}/api/auth/profile`, {
           headers: {
@@ -148,8 +147,7 @@ export default function Home() {
 
     try {
       const apiEndpoint =
-        process.env.NEXT_PUBLIC_BACKEND_URL ||
-        "https://nutrimorph-backend.vercel.app";
+        process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
 
       const res = await fetch(`${apiEndpoint}/api/auth/login`, {
         method: "POST",
@@ -222,8 +220,7 @@ export default function Home() {
       try {
         setLoading(true);
         const apiEndpoint =
-          process.env.NEXT_PUBLIC_BACKEND_URL ||
-          "https://nutrimorph-backend.vercel.app";
+          process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
 
         const response = await fetch(`${apiEndpoint}/api/payment/update-plan`, {
           method: "POST",
@@ -264,8 +261,7 @@ export default function Home() {
     token: string | null,
   ): Promise<CheckoutResponse> => {
     const apiEndpoint =
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      "https://nutrimorph-backend.vercel.app";
+      process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
 
     const res = await fetch(
       `${apiEndpoint}/api/payment/create-checkout-session`,
