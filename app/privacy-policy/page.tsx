@@ -42,63 +42,187 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p className="text-sm text-slate-400 mb-8">
-          Last updated: September 15, 2026
+          Last updated: October 30, 2026
         </p>
 
         <section className="space-y-6 text-slate-300 leading-relaxed">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
             <h2 className="text-xl font-semibold text-white mb-2">
-              1. Overview
+              1. Overview & Information Collection
             </h2>
-            <p>
-              NutriMorph (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is
-              committed to protecting your privacy. This Privacy Policy explains
-              how we collect, use, and process your personal information when
-              using our mobile application and AI nutrition services.
+            <p className="mb-4">
+              This privacy policy applies to the NutriMorph app for mobile
+              devices, together with any related services operated by NutriMorph
+              Tech (collectively, the &quot;Application&quot;). NutriMorph Tech
+              is hereby referred to as the &quot;Service Provider&quot;.
             </p>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-            <h2 className="text-xl font-semibold text-white mb-2">
-              2. Data Collection & Usage
-            </h2>
+            <p className="mb-2">
+              The Application collects information when you download and use it,
+              including:
+            </p>
             <ul className="list-disc pl-5 space-y-2">
               <li>
-                <strong>Account Information:</strong> Name, email address, and
-                authentication credentials for profile management.
+                <strong>Account & Profile Information:</strong> Name, email
+                address, authentication credentials, dietary preferences, daily
+                calorie targets, body weight, height, and goal choices.
               </li>
               <li>
-                <strong>Health & Fitness Metrics:</strong> Daily calorie
-                targets, body weight, height, and goal choices provided directly
-                by you.
+                <strong>Device & Usage Data:</strong> Your device&apos;s
+                Internet Protocol (IP) address, operating system, pages visited,
+                time and date of visits, and time spent on pages.
               </li>
               <li>
                 <strong>Meal Photos & Text Inputs:</strong> Images of food and
-                chat messages submitted for macro estimation and meal parsing.
+                chat messages submitted for macro estimation and meal parsing
+                via NutriBot.
               </li>
             </ul>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
             <h2 className="text-xl font-semibold text-white mb-2">
-              3. Third-Party AI Processing (Google Gemini API)
+              2. Cookies and Tracking Technologies
             </h2>
             <p>
-              NutriMorph uses Google&apos;s Gemini API to analyze food photos,
-              estimate nutrition facts, and generate conversational advice.
-              Image Base64 strings and chat queries are processed securely
-              through API endpoints and are not sold or used for targeted
-              advertising.
+              The Application or its third-party SDKs may use cookies, SDKs,
+              pixels, and similar technologies to support functionality,
+              analytics, or service delivery. Where required by applicable law,
+              the Service Provider will obtain consent before using
+              non-essential tracking technologies.
             </p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
             <h2 className="text-xl font-semibold text-white mb-2">
-              4. User Account & Data Deletion
+              3. Artificial Intelligence & Data Processing (Google Gemini API)
+            </h2>
+            <p>
+              The Application utilizes Artificial Intelligence (AI)
+              technologies, specifically the <strong>Google Gemini API</strong>,
+              to provide personalized nutrition plans, recipe recommendations,
+              and conversational responses through NutriBot. When using meal
+              scanning or chat features, prompt text and food imagery are
+              processed securely by AI models strictly to deliver service
+              functionality in accordance with this privacy policy.
+            </p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              4. Third-Party Access & Services
+            </h2>
+            <p className="mb-3">
+              Only aggregated, anonymized data is periodically transmitted to
+              external services to aid in improving the Application. The
+              Application integrates trusted third-party service providers which
+              have their own privacy policies:
+            </p>
+            <ul className="list-disc pl-5 space-y-1 text-emerald-400">
+              <li>
+                <a
+                  href="https://www.google.com/policies/privacy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  Google Play Services
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://policies.google.com/technologies/partner-sites"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  AdMob
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://firebase.google.com/support/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  Google Analytics for Firebase
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://firebase.google.com/support/privacy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  Firebase Crashlytics
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://expo.io/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  Expo
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://www.revenuecat.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  RevenueCat
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://stripe.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  Stripe
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://ai.google.dev/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  Google Gemini API
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              5. Your Rights & California Privacy Rights (CCPA/CPRA)
+            </h2>
+            <p className="mb-3">
+              You may request access to, correction of, or deletion of your
+              personal data. California residents have specific rights to know,
+              delete, or opt-out of personal information sharing. To exercise
+              your rights, contact us at{" "}
+              <strong>nutrimorphsupport@gmail.com</strong>.
+            </p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              6. Data Retention & Account Deletion
             </h2>
             <p className="mb-2">
-              In compliance with Google Play Developer Policies, you can request
-              full deletion of your account and associated data at any time:
+              User-provided data is retained for the duration of your use plus
+              12 months. In compliance with Google Play Developer Policies, you
+              can request full deletion of your account and associated data at
+              any time:
             </p>
             <p>
               Submit an automated request via our{" "}
@@ -108,7 +232,20 @@ export default function PrivacyPolicy() {
               >
                 Account Deletion Page
               </Link>{" "}
-              or email support at <strong>support@nutrimorph.app</strong>.
+              or email support directly at{" "}
+              <strong>nutrimorphsupport@gmail.com</strong>.
+            </p>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              7. Children&apos;s Privacy
+            </h2>
+            <p>
+              The Application is not intended for children under 16 years of
+              age. The Service Provider does not knowingly collect personally
+              identifiable information from children under 16. If discovered,
+              such information will be immediately deleted.
             </p>
           </div>
         </section>

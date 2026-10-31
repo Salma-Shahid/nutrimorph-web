@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     "Fitness & Health App",
   ],
   authors: [{ name: "Salma Shahid" }],
-  metadataBase: new URL("https://nutrimorph-web.vercel.app"),
+  metadataBase: new URL("https://nutrimorph.app"),
   alternates: {
     canonical: "/",
   },
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://nutrimorph-web.vercel.app",
+    url: "https://nutrimorph.app",
     title: "NutriMorph - AI Powered Nutrition & Macro Tracker",
     description:
       "Transform your health journey with instant AI meal scanning and voice tracking. Available globally.",
