@@ -46,6 +46,12 @@ export default function AdminPage() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [tierFilter, setTierFilter] = useState<string>("all");
 
+  // Broadcast States
+  const [broadcastTitle, setBroadcastTitle] = useState<string>("");
+  const [broadcastMessage, setBroadcastMessage] = useState<string>("");
+  const [targetAudience, setTargetAudience] = useState<string>("all");
+  const [sendingBroadcast, setSendingBroadcast] = useState<boolean>(false);
+
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
 
@@ -185,6 +191,45 @@ export default function AdminPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message || (err instanceof Error ? err.message : "Unknown error");
       alert("Failed to delete review: " + errorMsg);
+    }
+  };
+
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastTitle || !broadcastMessage) {
+      alert("Please fill in both title and message.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Are you sure you want to broadcast this message to ${targetAudience} users?`,
+      )
+    )
+      return;
+
+    try {
+      setSendingBroadcast(true);
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/admin/broadcast`,
+        { title: broadcastTitle, message: broadcastMessage, targetAudience },
+        config,
+      );
+
+      alert(res.data.message || "Broadcast sent successfully!");
+      setBroadcastTitle("");
+      setBroadcastMessage("");
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : "Failed to send broadcast.");
+      alert("Broadcast Error: " + errorMsg);
+    } finally {
+      setSendingBroadcast(false);
     }
   };
 
@@ -330,7 +375,73 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Review Moderation Section (New Feature) */}
+        {/* Broadcast / Announcements Section */}
+        <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-gray-200">
+              📢 Broadcast Announcements
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Send push notifications or updates to your app users.
+            </p>
+          </div>
+
+          <form onSubmit={handleSendBroadcast} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Notification Title
+                </label>
+                <input
+                  type="text"
+                  placeholder="Maslan: New Pro Features Available! 🚀"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Target Audience
+                </label>
+                <select
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="all">All Users</option>
+                  <option value="pro">Pro Subscribers Only</option>
+                  <option value="free">Free Users Only</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Message Body
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Yahan apna detailed message likhein..."
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+              ></textarea>
+            </div>
+
+            <button
+              type="submit"
+              disabled={sendingBroadcast}
+              className="bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold px-6 py-2.5 rounded-xl text-sm transition shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+            >
+              {sendingBroadcast
+                ? "Sending Broadcast..."
+                : "🚀 Send Broadcast Now"}
+            </button>
+          </form>
+        </div>
+
+        {/* Review Moderation Section */}
         <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
           <div className="p-6 border-b border-gray-800">
             <h2 className="text-xl font-bold text-gray-200">
