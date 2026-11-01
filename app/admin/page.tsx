@@ -79,6 +79,10 @@ export default function AdminPage() {
     expoOtaLimitMB: 1000,
   });
 
+  const [testingEmail, setTestingEmail] = useState<boolean>(false);
+  const [cleaningDb, setCleaningDb] = useState<boolean>(false);
+  const [syncingServices, setSyncingServices] = useState<boolean>(false);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -290,6 +294,92 @@ export default function AdminPage() {
     }
   };
 
+  // Action Handlers
+  const handleTestEmail = async () => {
+    try {
+      setTestingEmail(true);
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/admin/test-email`,
+        {},
+        config,
+      );
+      alert(
+        "✅ Success: " + (res.data.message || "Test email sent successfully!"),
+      );
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : "Failed to send test email.");
+      alert("⚠️ Test Email Error: " + errorMsg);
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
+  const handleCleanupDb = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to purge logs older than 30 days from the database?",
+      )
+    )
+      return;
+    try {
+      setCleaningDb(true);
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/admin/cleanup-db`,
+        {},
+        config,
+      );
+      alert(
+        "✅ Database Cleanup: " +
+          (res.data.message || "Cleanup completed successfully!"),
+      );
+      fetchAdminData();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : "Failed to clean up database.");
+      alert("⚠️ Cleanup Error: " + errorMsg);
+    } finally {
+      setCleaningDb(false);
+    }
+  };
+
+  const handleSyncServices = async () => {
+    try {
+      setSyncingServices(true);
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/admin/sync-services`,
+        {},
+        config,
+      );
+      alert(
+        "✅ Services Synced: " +
+          (res.data.message || "All integration pipelines active!"),
+      );
+      fetchAdminData();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : "Failed to sync services.");
+      alert("⚠️ Sync Error: " + errorMsg);
+    } finally {
+      setSyncingServices(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-emerald-400 font-medium text-lg">
@@ -420,6 +510,68 @@ export default function AdminPage() {
             <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
               🟢 All Systems Healthy
             </span>
+          </div>
+
+          {/* Live Integration Control Panel */}
+          <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-4">
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div>
+                <h3 className="text-lg font-bold text-gray-200">
+                  ⚙️ Live Integration Control Panel
+                </h3>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  Perform live management and health checks across active
+                  integrations.
+                </p>
+              </div>
+              <span className="text-xs text-amber-400 font-semibold bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+                🔒 Admin Protected Actions
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              {/* Test Email Action */}
+              <button
+                onClick={handleTestEmail}
+                disabled={testingEmail}
+                className="bg-gray-950 hover:bg-gray-800 border border-emerald-500/30 text-emerald-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+              >
+                <div className="text-sm font-bold flex items-center gap-2">
+                  📧 {testingEmail ? "Sending..." : "Test Email Pipeline"}
+                </div>
+                <div className="text-gray-500 text-[11px]">
+                  Dispatch ping to verified SMTP route
+                </div>
+              </button>
+
+              {/* DB Cleanup Action */}
+              <button
+                onClick={handleCleanupDb}
+                disabled={cleaningDb}
+                className="bg-gray-950 hover:bg-gray-800 border border-sky-500/30 text-sky-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+              >
+                <div className="text-sm font-bold flex items-center gap-2">
+                  🗄️ {cleaningDb ? "Purging..." : "Prune DB Activity Logs"}
+                </div>
+                <div className="text-gray-500 text-[11px]">
+                  Clean old logs & free storage space
+                </div>
+              </button>
+
+              {/* Sync Services Action */}
+              <button
+                onClick={handleSyncServices}
+                disabled={syncingServices}
+                className="bg-gray-950 hover:bg-gray-800 border border-purple-500/30 text-purple-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+              >
+                <div className="text-sm font-bold flex items-center gap-2">
+                  🔄 {syncingServices ? "Syncing..." : "Sync All Services"}
+                </div>
+                <div className="text-gray-500 text-[11px]">
+                  Refresh live API status & health
+                </div>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
