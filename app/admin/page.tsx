@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 
 // Interfaces for TypeScript Safety
@@ -27,6 +27,10 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+
+  // Search and Filter States (Feature 1)
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [tierFilter, setTierFilter] = useState<string>("all"); // 'all', 'pro', 'free'
 
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
@@ -87,6 +91,21 @@ export default function AdminPage() {
     };
   }, [fetchAdminData]);
 
+  // Filtered Users based on Search and Tier Filter
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesTier =
+        tierFilter === "all" ||
+        (user.subscriptionTier || "free") === tierFilter;
+
+      return matchesSearch && matchesTier;
+    });
+  }, [users, searchTerm, tierFilter]);
+
   // Toggle User Subscription Tier (Free <-> Pro)
   const handleToggleTier = async (userId: string, currentTier?: string) => {
     try {
@@ -134,6 +153,13 @@ export default function AdminPage() {
       </div>
     );
   }
+
+  // Calculate percentages for Visual Analytics bar
+  const totalUsersCount = stats?.totalUsers || 1;
+  const proPercentage = Math.round(
+    ((stats?.proUsers || 0) / totalUsersCount) * 100,
+  );
+  const freePercentage = 100 - proPercentage;
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 md:p-10">
@@ -199,12 +225,64 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* User Management Table */}
+        {/* Visual Analytics & Subscription Breakdown (Feature 2) */}
+        {stats && (
+          <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-4">
+            <h3 className="text-lg font-bold text-gray-200">
+              📊 Subscription Distribution Analytics
+            </h3>
+            <div className="flex items-center justify-between text-sm text-gray-400">
+              <span>
+                Pro Users:{" "}
+                <strong className="text-sky-400">{proPercentage}%</strong>
+              </span>
+              <span>
+                Free Users:{" "}
+                <strong className="text-gray-200">{freePercentage}%</strong>
+              </span>
+            </div>
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-800 h-4 rounded-full overflow-hidden flex">
+              <div
+                className="bg-sky-500 transition-all duration-500"
+                style={{ width: `${proPercentage}%` }}
+                title={`Pro Users: ${stats.proUsers}`}
+              ></div>
+              <div
+                className="bg-gray-700 transition-all duration-500"
+                style={{ width: `${freePercentage}%` }}
+                title={`Free Users: ${stats.freeUsers}`}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        {/* User Management Section with Search & Filter Controls (Feature 1) */}
         <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
-          <div className="p-6 border-b border-gray-800">
+          <div className="p-6 border-b border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <h2 className="text-xl font-bold text-gray-200">
-              Registered Accounts ({users.length})
+              Registered Accounts ({filteredUsers.length} / {users.length})
             </h2>
+
+            {/* Search & Filter Inputs */}
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-gray-950 border border-gray-800 text-gray-200 px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-emerald-500 w-full sm:w-64"
+              />
+              <select
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value)}
+                className="bg-gray-950 border border-gray-800 text-gray-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+              >
+                <option value="all">All Tiers</option>
+                <option value="pro">Pro</option>
+                <option value="free">Free</option>
+              </select>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -219,57 +297,65 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/60 text-sm">
-                {users.map((user) => (
-                  <tr
-                    key={user._id}
-                    className="hover:bg-gray-850/50 transition"
-                  >
-                    <td className="p-4 font-semibold text-gray-200">
-                      {user.name}
-                    </td>
-                    <td className="p-4 text-gray-400">{user.email}</td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                          user.role === "admin"
-                            ? "bg-purple-900/60 text-purple-300 border border-purple-500/30"
-                            : "bg-gray-800 text-gray-400"
-                        }`}
-                      >
-                        {user.role || "user"}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                          user.subscriptionTier === "pro"
-                            ? "bg-sky-900/60 text-sky-300 border border-sky-500/30"
-                            : "bg-gray-800 text-gray-400"
-                        }`}
-                      >
-                        {user.subscriptionTier || "free"}
-                      </span>
-                    </td>
-                    <td className="p-4 flex items-center gap-3">
-                      <button
-                        onClick={() =>
-                          handleToggleTier(user._id, user.subscriptionTier)
-                        }
-                        className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium transition"
-                      >
-                        Toggle Tier
-                      </button>
-                      {user.role !== "admin" && (
-                        <button
-                          onClick={() => handleDeleteUser(user._id)}
-                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((user) => (
+                    <tr
+                      key={user._id}
+                      className="hover:bg-gray-850/50 transition"
+                    >
+                      <td className="p-4 font-semibold text-gray-200">
+                        {user.name}
+                      </td>
+                      <td className="p-4 text-gray-400">{user.email}</td>
+                      <td className="p-4">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            user.role === "admin"
+                              ? "bg-purple-900/60 text-purple-300 border border-purple-500/30"
+                              : "bg-gray-800 text-gray-400"
+                          }`}
                         >
-                          Delete
+                          {user.role || "user"}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            user.subscriptionTier === "pro"
+                              ? "bg-sky-900/60 text-sky-300 border border-sky-500/30"
+                              : "bg-gray-800 text-gray-400"
+                          }`}
+                        >
+                          {user.subscriptionTier || "free"}
+                        </span>
+                      </td>
+                      <td className="p-4 flex items-center gap-3">
+                        <button
+                          onClick={() =>
+                            handleToggleTier(user._id, user.subscriptionTier)
+                          }
+                          className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium transition"
+                        >
+                          Toggle Tier
                         </button>
-                      )}
+                        {user.role !== "admin" && (
+                          <button
+                            onClick={() => handleDeleteUser(user._id)}
+                            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-gray-500">
+                      No matching users found.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
