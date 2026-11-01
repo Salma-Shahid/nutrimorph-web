@@ -35,11 +35,20 @@ interface ReviewData {
   createdAt?: string;
 }
 
+interface ActivityLogData {
+  _id: string;
+  adminEmail: string;
+  action: string;
+  details: string;
+  createdAt: string;
+}
+
 export default function AdminPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
   const [reviews, setReviews] = useState<ReviewData[]>([]);
+  const [logs, setLogs] = useState<ActivityLogData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
@@ -73,17 +82,21 @@ export default function AdminPage() {
         },
       };
 
-      const [statsRes, usersRes, reviewsRes] = await Promise.all([
+      const [statsRes, usersRes, reviewsRes, logsRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/admin/stats`, config),
         axios.get(`${API_BASE_URL}/admin/users`, config),
         axios
           .get(`${API_BASE_URL}/admin/reviews`, config)
+          .catch(() => ({ data: { data: [] } })),
+        axios
+          .get(`${API_BASE_URL}/admin/logs`, config)
           .catch(() => ({ data: { data: [] } })),
       ]);
 
       setStats(statsRes.data.data);
       setUsers(usersRes.data.data);
       setReviews(reviewsRes.data.data || []);
+      setLogs(logsRes.data.data || []);
 
       // Revenue fetch fallback
       try {
@@ -222,6 +235,7 @@ export default function AdminPage() {
       alert(res.data.message || "Broadcast sent successfully!");
       setBroadcastTitle("");
       setBroadcastMessage("");
+      fetchAdminData();
     } catch (err: unknown) {
       const errorMsg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
@@ -439,6 +453,59 @@ export default function AdminPage() {
                 : "🚀 Send Broadcast Now"}
             </button>
           </form>
+        </div>
+
+        {/* Admin Activity Logs Section */}
+        <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-800">
+            <h2 className="text-xl font-bold text-gray-200">
+              🛡️ Admin Audit & Activity Logs ({logs.length})
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Track administrative actions and security updates.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-800">
+                  <th className="p-4">Admin Email</th>
+                  <th className="p-4">Action</th>
+                  <th className="p-4">Details</th>
+                  <th className="p-4">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60 text-sm">
+                {logs.length > 0 ? (
+                  logs.map((log) => (
+                    <tr
+                      key={log._id}
+                      className="hover:bg-gray-850/50 transition"
+                    >
+                      <td className="p-4 font-medium text-emerald-400">
+                        {log.adminEmail || "Admin"}
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-gray-800 text-gray-300 rounded-full text-xs font-bold border border-gray-700">
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="p-4 text-gray-300">{log.details}</td>
+                      <td className="p-4 text-gray-400 text-xs">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-gray-500">
+                      No activity logs recorded yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Review Moderation Section */}
