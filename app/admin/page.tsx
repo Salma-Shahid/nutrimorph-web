@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 // Interfaces for TypeScript Safety
@@ -28,16 +28,15 @@ export default function AdminPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  // Backend Base URL (Environment Variable ya Fallback)
-  const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
 
-  const fetchAdminData = async () => {
+  const fetchAdminData = useCallback(async () => {
     try {
-      setLoading(true);
       setError("");
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      
       if (!token) {
         setError("Admin authentication token missing. Please log in first.");
         setLoading(false);
@@ -57,19 +56,36 @@ export default function AdminPage() {
 
       setStats(statsRes.data.data);
       setUsers(usersRes.data.data);
-      setLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Admin Fetch Error:", err);
-      setError(
-        err.response?.data?.message || "Failed to load admin dashboard data."
-      );
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error
+          ? err.message
+          : "Failed to load admin dashboard data.");
+      setError(errorMsg);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL]);
 
   useEffect(() => {
-    fetchAdminData();
-  }, []);
+    let isMounted = true;
+
+    const loadData = async () => {
+      setLoading(true);
+      await fetchAdminData();
+    };
+
+    if (isMounted) {
+      loadData();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchAdminData]);
 
   // Toggle User Subscription Tier (Free <-> Pro)
   const handleToggleTier = async (userId: string, currentTier?: string) => {
@@ -81,12 +97,15 @@ export default function AdminPage() {
       await axios.patch(
         `${API_BASE_URL}/admin/users/${userId}/tier`,
         { subscriptionTier: newTier },
-        config
+        config,
       );
 
       fetchAdminData();
-    } catch (err: any) {
-      alert("Failed to update tier: " + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || (err instanceof Error ? err.message : "Unknown error");
+      alert("Failed to update tier: " + errorMsg);
     }
   };
 
@@ -100,8 +119,11 @@ export default function AdminPage() {
       await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, config);
 
       fetchAdminData();
-    } catch (err: any) {
-      alert("Failed to delete user: " + (err.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || (err instanceof Error ? err.message : "Unknown error");
+      alert("Failed to delete user: " + errorMsg);
     }
   };
 
@@ -151,19 +173,25 @@ export default function AdminPage() {
               </p>
             </div>
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
-              <p className="text-gray-400 text-sm font-medium">Active Pro Users</p>
+              <p className="text-gray-400 text-sm font-medium">
+                Active Pro Users
+              </p>
               <p className="text-4xl font-bold text-sky-400 mt-2">
                 {stats.proUsers}
               </p>
             </div>
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
-              <p className="text-gray-400 text-sm font-medium">Total Logged Meals</p>
+              <p className="text-gray-400 text-sm font-medium">
+                Total Logged Meals
+              </p>
               <p className="text-4xl font-bold text-amber-400 mt-2">
                 {stats.totalMeals}
               </p>
             </div>
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
-              <p className="text-gray-400 text-sm font-medium">Total Exercises</p>
+              <p className="text-gray-400 text-sm font-medium">
+                Total Exercises
+              </p>
               <p className="text-4xl font-bold text-purple-400 mt-2">
                 {stats.totalExercises}
               </p>
@@ -192,7 +220,10 @@ export default function AdminPage() {
               </thead>
               <tbody className="divide-y divide-gray-800/60 text-sm">
                 {users.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-850/50 transition">
+                  <tr
+                    key={user._id}
+                    className="hover:bg-gray-850/50 transition"
+                  >
                     <td className="p-4 font-semibold text-gray-200">
                       {user.name}
                     </td>
@@ -221,7 +252,9 @@ export default function AdminPage() {
                     </td>
                     <td className="p-4 flex items-center gap-3">
                       <button
-                        onClick={() => handleToggleTier(user._id, user.subscriptionTier)}
+                        onClick={() =>
+                          handleToggleTier(user._id, user.subscriptionTier)
+                        }
                         className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium transition"
                       >
                         Toggle Tier
