@@ -3,13 +3,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 
-// Interfaces for TypeScript Safety
 interface StatsData {
   totalUsers: number;
   proUsers: number;
   freeUsers: number;
   totalMeals: number;
   totalExercises: number;
+}
+
+interface RevenueData {
+  totalRevenue: number;
+  activeSubscriptions: number;
+  currency: string;
 }
 
 interface UserData {
@@ -24,13 +29,13 @@ interface UserData {
 
 export default function AdminPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
-  // Search and Filter States (Feature 1)
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [tierFilter, setTierFilter] = useState<string>("all"); // 'all', 'pro', 'free'
+  const [tierFilter, setTierFilter] = useState<string>("all");
 
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
@@ -53,6 +58,7 @@ export default function AdminPage() {
         },
       };
 
+      // Correctly typed Promise.all fetch
       const [statsRes, usersRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/admin/stats`, config),
         axios.get(`${API_BASE_URL}/admin/users`, config),
@@ -60,6 +66,23 @@ export default function AdminPage() {
 
       setStats(statsRes.data.data);
       setUsers(usersRes.data.data);
+
+      // Fetch Revenue route with fallback
+      try {
+        const revenueRes = await axios.get(
+          `${API_BASE_URL}/admin/revenue`,
+          config,
+        );
+        setRevenue(revenueRes.data.data);
+      } catch {
+        // Fallback calculation if revenue route fails
+        const proCount = statsRes.data.data?.proUsers || 0;
+        setRevenue({
+          totalRevenue: proCount * 9.99,
+          activeSubscriptions: proCount,
+          currency: "USD",
+        });
+      }
     } catch (err: unknown) {
       console.error("Admin Fetch Error:", err);
       const errorMsg =
@@ -76,22 +99,18 @@ export default function AdminPage() {
 
   useEffect(() => {
     let isMounted = true;
-
     const loadData = async () => {
       setLoading(true);
       await fetchAdminData();
     };
-
     if (isMounted) {
       loadData();
     }
-
     return () => {
       isMounted = false;
     };
   }, [fetchAdminData]);
 
-  // Filtered Users based on Search and Tier Filter
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const matchesSearch =
@@ -106,7 +125,6 @@ export default function AdminPage() {
     });
   }, [users, searchTerm, tierFilter]);
 
-  // Toggle User Subscription Tier (Free <-> Pro)
   const handleToggleTier = async (userId: string, currentTier?: string) => {
     try {
       const newTier = currentTier === "pro" ? "free" : "pro";
@@ -128,7 +146,6 @@ export default function AdminPage() {
     }
   };
 
-  // Delete User Account
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
@@ -136,7 +153,6 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, config);
-
       fetchAdminData();
     } catch (err: unknown) {
       const errorMsg =
@@ -154,7 +170,6 @@ export default function AdminPage() {
     );
   }
 
-  // Calculate percentages for Visual Analytics bar
   const totalUsersCount = stats?.totalUsers || 1;
   const proPercentage = Math.round(
     ((stats?.proUsers || 0) / totalUsersCount) * 100,
@@ -182,7 +197,6 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Error Alert */}
         {error && (
           <div className="bg-red-900/40 border border-red-500/50 text-red-200 p-4 rounded-xl text-sm">
             ⚠️ {error}
@@ -225,7 +239,43 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Visual Analytics & Subscription Breakdown (Feature 2) */}
+        {/* Revenue & Subscription Management Section (New Feature) */}
+        {revenue && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm font-medium">
+                  Total Estimated Revenue
+                </p>
+                <p className="text-3xl font-extrabold text-emerald-400 mt-2">
+                  ${revenue.totalRevenue.toFixed(2)}{" "}
+                  <span className="text-xs text-gray-400">
+                    {revenue.currency}
+                  </span>
+                </p>
+              </div>
+              <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 text-emerald-400 text-2xl">
+                💰
+              </div>
+            </div>
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm font-medium">
+                  Active Pro Subscriptions
+                </p>
+                <p className="text-3xl font-extrabold text-sky-400 mt-2">
+                  {revenue.activeSubscriptions}{" "}
+                  <span className="text-xs text-gray-400">Subscribers</span>
+                </p>
+              </div>
+              <div className="bg-sky-500/10 p-4 rounded-xl border border-sky-500/20 text-sky-400 text-2xl">
+                ⭐
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Visual Analytics */}
         {stats && (
           <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-4">
             <h3 className="text-lg font-bold text-gray-200">
@@ -241,30 +291,25 @@ export default function AdminPage() {
                 <strong className="text-gray-200">{freePercentage}%</strong>
               </span>
             </div>
-            {/* Progress Bar */}
             <div className="w-full bg-gray-800 h-4 rounded-full overflow-hidden flex">
               <div
                 className="bg-sky-500 transition-all duration-500"
                 style={{ width: `${proPercentage}%` }}
-                title={`Pro Users: ${stats.proUsers}`}
               ></div>
               <div
                 className="bg-gray-700 transition-all duration-500"
                 style={{ width: `${freePercentage}%` }}
-                title={`Free Users: ${stats.freeUsers}`}
               ></div>
             </div>
           </div>
         )}
 
-        {/* User Management Section with Search & Filter Controls (Feature 1) */}
+        {/* User Management Section */}
         <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
           <div className="p-6 border-b border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <h2 className="text-xl font-bold text-gray-200">
               Registered Accounts ({filteredUsers.length} / {users.length})
             </h2>
-
-            {/* Search & Filter Inputs */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <input
                 type="text"
