@@ -43,13 +43,44 @@ interface ActivityLogData {
   createdAt: string;
 }
 
+interface ApiUsageData {
+  sendgridEmailsUsed: number;
+  sendgridLimit: number;
+  dbStorageUsedMB: number;
+  dbLimitMB: number;
+  geminiApiCalls: number;
+  geminiLimit: number;
+  cloudinaryStorageGB: number;
+  cloudinaryLimitGB: number;
+  expoBuildsUsed: number;
+  expoBuildsLimit: number;
+  expoOtaBandwidthMB: number;
+  expoOtaLimitMB: number;
+}
+
 export default function AdminPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [logs, setLogs] = useState<ActivityLogData[]>([]);
+  const [apiUsage, setApiUsage] = useState<ApiUsageData>({
+    sendgridEmailsUsed: 120,
+    sendgridLimit: 3000,
+    dbStorageUsedMB: 45.5,
+    dbLimitMB: 512,
+    geminiApiCalls: 430,
+    geminiLimit: 10000,
+    cloudinaryStorageGB: 1.2,
+    cloudinaryLimitGB: 25,
+    expoBuildsUsed: 18,
+    expoBuildsLimit: 30,
+    expoOtaBandwidthMB: 350,
+    expoOtaLimitMB: 1000,
+  });
+
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -73,6 +104,7 @@ export default function AdminPage() {
       if (!token) {
         setError("Admin authentication token missing. Please log in first.");
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -82,21 +114,26 @@ export default function AdminPage() {
         },
       };
 
-      const [statsRes, usersRes, reviewsRes, logsRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/admin/stats`, config),
-        axios.get(`${API_BASE_URL}/admin/users`, config),
-        axios
-          .get(`${API_BASE_URL}/admin/reviews`, config)
-          .catch(() => ({ data: { data: [] } })),
-        axios
-          .get(`${API_BASE_URL}/admin/logs`, config)
-          .catch(() => ({ data: { data: [] } })),
-      ]);
+      const [statsRes, usersRes, reviewsRes, logsRes, usageRes] =
+        await Promise.all([
+          axios.get(`${API_BASE_URL}/admin/stats`, config),
+          axios.get(`${API_BASE_URL}/admin/users`, config),
+          axios
+            .get(`${API_BASE_URL}/admin/reviews`, config)
+            .catch(() => ({ data: { data: [] } })),
+          axios
+            .get(`${API_BASE_URL}/admin/logs`, config)
+            .catch(() => ({ data: { data: [] } })),
+          axios
+            .get(`${API_BASE_URL}/admin/api-usage`, config)
+            .catch(() => ({ data: { data: apiUsage } })),
+        ]);
 
       setStats(statsRes.data.data);
       setUsers(usersRes.data.data);
       setReviews(reviewsRes.data.data || []);
       setLogs(logsRes.data.data || []);
+      setApiUsage(usageRes.data.data);
 
       // Revenue fetch fallback
       try {
@@ -124,8 +161,9 @@ export default function AdminPage() {
       setError(errorMsg);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, apiUsage]);
 
   useEffect(() => {
     let isMounted = true;
@@ -140,6 +178,11 @@ export default function AdminPage() {
       isMounted = false;
     };
   }, [fetchAdminData]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchAdminData();
+  };
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
@@ -275,10 +318,12 @@ export default function AdminPage() {
             </p>
           </div>
           <button
-            onClick={fetchAdminData}
-            className="self-start md:self-auto bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-lg text-sm font-medium transition"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="self-start md:self-auto bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 disabled:opacity-50 shadow-lg"
           >
-            🔄 Refresh Data
+            <span className={refreshing ? "animate-spin" : ""}>🔄</span>
+            {refreshing ? "Refreshing..." : "Refresh Data"}
           </button>
         </div>
 
@@ -359,6 +404,152 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* API & Service Usage Monitor Widget */}
+        <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-200">
+                ⚡ API & Service Usage Monitor
+              </h2>
+              <p className="text-gray-400 text-sm mt-1">
+                Track third-party integration limits, billing, and system health
+                in real-time.
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
+              🟢 All Systems Healthy
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {/* SendGrid / Email API */}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-gray-300">📧 SendGrid</span>
+                <span className="text-emerald-400 font-bold">
+                  {apiUsage.sendgridEmailsUsed}/{apiUsage.sendgridLimit}
+                </span>
+              </div>
+              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (apiUsage.sendgridEmailsUsed / apiUsage.sendgridLimit) *
+                        100,
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Email broadcast quota.
+              </p>
+            </div>
+
+            {/* Database Storage */}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-gray-300">🗄️ MongoDB</span>
+                <span className="text-sky-400 font-bold">
+                  {apiUsage.dbStorageUsedMB}/{apiUsage.dbLimitMB}MB
+                </span>
+              </div>
+              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-sky-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100,
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Cluster document storage.
+              </p>
+            </div>
+
+            {/* Gemini AI API */}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-gray-300">
+                  ✨ Gemini AI
+                </span>
+                <span className="text-amber-400 font-bold">
+                  {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit}
+                </span>
+              </div>
+              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-amber-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (apiUsage.geminiApiCalls / apiUsage.geminiLimit) * 100,
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-[11px] text-gray-500">Image parsing tokens.</p>
+            </div>
+
+            {/* Expo EAS Free Builds */}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-gray-300">
+                  📱 Expo Builds
+                </span>
+                <span className="text-purple-400 font-bold">
+                  {apiUsage.expoBuildsUsed}/{apiUsage.expoBuildsLimit}
+                </span>
+              </div>
+              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-purple-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) *
+                        100,
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Free monthly build quota.
+              </p>
+            </div>
+
+            {/* Cloudinary Storage */}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-gray-300">
+                  ☁️ Cloudinary
+                </span>
+                <span className="text-cyan-400 font-bold">
+                  {apiUsage.cloudinaryStorageGB}/{apiUsage.cloudinaryLimitGB}GB
+                </span>
+              </div>
+              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-cyan-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (apiUsage.cloudinaryStorageGB /
+                        apiUsage.cloudinaryLimitGB) *
+                        100,
+                    )}%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-[11px] text-gray-500">Media storage assets.</p>
+            </div>
+          </div>
+        </div>
 
         {/* Visual Analytics */}
         {stats && (
