@@ -82,6 +82,8 @@ export default function AdminPage() {
   const [testingEmail, setTestingEmail] = useState<boolean>(false);
   const [cleaningDb, setCleaningDb] = useState<boolean>(false);
   const [syncingServices, setSyncingServices] = useState<boolean>(false);
+  const [purgingCloud, setPurgingCloud] = useState<boolean>(false);
+  const [checkingExpo, setCheckingExpo] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -380,6 +382,61 @@ export default function AdminPage() {
     }
   };
 
+  const handlePurgeCloudinary = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to permanently remove orphaned images from Cloudinary?",
+      )
+    )
+      return;
+    try {
+      setPurgingCloud(true);
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/admin/purge-cloudinary`,
+        {},
+        config,
+      );
+      alert(
+        "✅ Cloudinary Success: " +
+          (res.data.message || "Storage space freed!"),
+      );
+      fetchAdminData();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : "Failed to purge cloud storage.");
+      alert("⚠️ Cloudinary Error: " + errorMsg);
+    } finally {
+      setPurgingCloud(false);
+    }
+  };
+
+  const handleCheckExpoBuilds = async () => {
+    try {
+      setCheckingExpo(true);
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const res = await axios.get(`${API_BASE_URL}/admin/expo-builds`, config);
+      alert(
+        "📱 Expo EAS Status: " +
+          (res.data.message || "Build queues checked successfully!"),
+      );
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : "Failed to check Expo builds.");
+      alert("⚠️ Expo Build Error: " + errorMsg);
+    } finally {
+      setCheckingExpo(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-emerald-400 font-medium text-lg">
@@ -394,7 +451,7 @@ export default function AdminPage() {
   );
   const freePercentage = 100 - proPercentage;
 
-  return (
+ return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 md:p-10">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
@@ -529,7 +586,7 @@ export default function AdminPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-2">
               {/* Test Email Action */}
               <button
                 onClick={handleTestEmail}
@@ -569,6 +626,34 @@ export default function AdminPage() {
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Refresh live API status & health
+                </div>
+              </button>
+
+              {/* Check Expo Builds */}
+              <button
+                onClick={handleCheckExpoBuilds}
+                disabled={checkingExpo}
+                className="bg-gray-950 hover:bg-gray-800 border border-indigo-500/30 text-indigo-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+              >
+                <div className="text-sm font-bold flex items-center gap-2">
+                  📱 {checkingExpo ? "Checking..." : "View Active Builds"}
+                </div>
+                <div className="text-gray-500 text-[11px]">
+                  Monitor mobile build queues
+                </div>
+              </button>
+
+              {/* Purge Cloudinary */}
+              <button
+                onClick={handlePurgeCloudinary}
+                disabled={purgingCloud}
+                className="bg-gray-950 hover:bg-gray-800 border border-cyan-500/30 text-cyan-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+              >
+                <div className="text-sm font-bold flex items-center gap-2">
+                  ☁️ {purgingCloud ? "Purging..." : "Purge Unused Images"}
+                </div>
+                <div className="text-gray-500 text-[11px]">
+                  Free cloud storage assets
                 </div>
               </button>
             </div>
@@ -612,33 +697,7 @@ export default function AdminPage() {
                 <div
                   className="bg-sky-500 h-full transition-all duration-500"
                   style={{
-                    width: `${Math.min(
-                      100,
-                      (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100,
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-              <p className="text-[11px] text-gray-500">
-                Cluster document storage.
-              </p>
-            </div>
-
-            {/* Gemini AI API */}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-semibold text-gray-300">
-                  ✨ Gemini AI
-                </span>
-                <span className="text-amber-400 font-bold">
-                  {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit}
-                </span>
-              </div>
-              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-amber-500 h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(
+                    width: `${Math.min( 100, (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100, )}\%`, }} ></div> </div> <p className="text-[11px] text-gray-500"> Cluster document storage. </p> </div>  {/* Gemini AI API */} <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2"> <div className="flex justify-between items-center text-xs"> <span className="font-semibold text-gray-300"> ✨ Gemini AI </span> <span className="text-amber-400 font-bold"> {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit} </span> </div> <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden"> <div className="bg-amber-500 h-full transition-all duration-500" style={{ width: `${Math.min(
                       100,
                       (apiUsage.geminiApiCalls / apiUsage.geminiLimit) * 100,
                     )}%`,
@@ -662,34 +721,7 @@ export default function AdminPage() {
                 <div
                   className="bg-purple-500 h-full transition-all duration-500"
                   style={{
-                    width: `${Math.min(
-                      100,
-                      (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) *
-                        100,
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-              <p className="text-[11px] text-gray-500">
-                Free monthly build quota.
-              </p>
-            </div>
-
-            {/* Cloudinary Storage */}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-semibold text-gray-300">
-                  ☁️ Cloudinary
-                </span>
-                <span className="text-cyan-400 font-bold">
-                  {apiUsage.cloudinaryStorageGB}/{apiUsage.cloudinaryLimitGB}GB
-                </span>
-              </div>
-              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-cyan-500 h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(
+                    width: `${Math.min( 100, (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) * 100, )}\%`, }} ></div> </div> <p className="text-[11px] text-gray-500"> Free monthly build quota. </p> </div>  {/* Cloudinary Storage */} <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2"> <div className="flex justify-between items-center text-xs"> <span className="font-semibold text-gray-300"> ☁️ Cloudinary </span> <span className="text-cyan-400 font-bold"> {apiUsage.cloudinaryStorageGB}/{apiUsage.cloudinaryLimitGB}GB </span> </div> <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden"> <div className="bg-cyan-500 h-full transition-all duration-500" style={{ width: `${Math.min(
                       100,
                       (apiUsage.cloudinaryStorageGB /
                         apiUsage.cloudinaryLimitGB) *
@@ -722,11 +754,7 @@ export default function AdminPage() {
             <div className="w-full bg-gray-800 h-4 rounded-full overflow-hidden flex">
               <div
                 className="bg-sky-500 transition-all duration-500"
-                style={{ width: `${proPercentage}%` }}
-              ></div>
-              <div
-                className="bg-gray-700 transition-all duration-500"
-                style={{ width: `${freePercentage}%` }}
+                style={{ width: `${proPercentage}\%` }} ></div> <div className="bg-gray-700 transition-all duration-500" style={{ width: `${freePercentage}%` }}
               ></div>
             </div>
           </div>
@@ -971,37 +999,27 @@ export default function AdminPage() {
                         <span
                           className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                             user.subscriptionTier === "pro"
-                              ? "bg-sky-900/60 text-sky-300 border border-sky-500/30"
+                              ? "bg-emerald-900/60 text-emerald-300 border border-emerald-500/30"
                               : "bg-gray-800 text-gray-400"
                           }`}
                         >
                           {user.subscriptionTier || "free"}
                         </span>
                       </td>
-                      <td className="p-4 flex items-center gap-3">
+                      <td className="p-4">
                         <button
-                          onClick={() =>
-                            handleToggleTier(user._id, user.subscriptionTier)
-                          }
-                          className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium transition"
+                          onClick={() => handleDeleteUser(user._id)}
+                          className="text-red-400 hover:text-red-300 focus:outline-none"
                         >
-                          Toggle Tier
+                          Delete
                         </button>
-                        {user.role !== "admin" && (
-                          <button
-                            onClick={() => handleDeleteUser(user._id)}
-                            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
-                          >
-                            Delete
-                          </button>
-                        )}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-gray-500">
-                      No matching users found.
+                    <td className="p-4 text-center text-gray-500" colSpan={5}>
+                      No users found.
                     </td>
                   </tr>
                 )}
@@ -1012,4 +1030,5 @@ export default function AdminPage() {
       </div>
     </div>
   );
-}
+};
+
