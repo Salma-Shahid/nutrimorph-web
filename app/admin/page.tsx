@@ -27,10 +27,19 @@ interface UserData {
   createdAt?: string;
 }
 
+interface ReviewData {
+  _id: string;
+  user?: { name: string; email: string };
+  rating: number;
+  comment: string;
+  createdAt?: string;
+}
+
 export default function AdminPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
+  const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
@@ -58,16 +67,19 @@ export default function AdminPage() {
         },
       };
 
-      // Correctly typed Promise.all fetch
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, usersRes, reviewsRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/admin/stats`, config),
         axios.get(`${API_BASE_URL}/admin/users`, config),
+        axios
+          .get(`${API_BASE_URL}/admin/reviews`, config)
+          .catch(() => ({ data: { data: [] } })),
       ]);
 
       setStats(statsRes.data.data);
       setUsers(usersRes.data.data);
+      setReviews(reviewsRes.data.data || []);
 
-      // Fetch Revenue route with fallback
+      // Revenue fetch fallback
       try {
         const revenueRes = await axios.get(
           `${API_BASE_URL}/admin/revenue`,
@@ -75,7 +87,6 @@ export default function AdminPage() {
         );
         setRevenue(revenueRes.data.data);
       } catch {
-        // Fallback calculation if revenue route fails
         const proCount = statsRes.data.data?.proUsers || 0;
         setRevenue({
           totalRevenue: proCount * 9.99,
@@ -136,7 +147,6 @@ export default function AdminPage() {
         { subscriptionTier: newTier },
         config,
       );
-
       fetchAdminData();
     } catch (err: unknown) {
       const errorMsg =
@@ -159,6 +169,22 @@ export default function AdminPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message || (err instanceof Error ? err.message : "Unknown error");
       alert("Failed to delete user: " + errorMsg);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!window.confirm("Are you sure you want to delete this review?")) return;
+    try {
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      await axios.delete(`${API_BASE_URL}/admin/reviews/${reviewId}`, config);
+      fetchAdminData();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || (err instanceof Error ? err.message : "Unknown error");
+      alert("Failed to delete review: " + errorMsg);
     }
   };
 
@@ -239,7 +265,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Revenue & Subscription Management Section (New Feature) */}
+        {/* Revenue & Subscription Management */}
         {revenue && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between">
@@ -303,6 +329,63 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* Review Moderation Section (New Feature) */}
+        <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-800">
+            <h2 className="text-xl font-bold text-gray-200">
+              ⭐ User Reviews & Feedback Moderation ({reviews.length})
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-800">
+                  <th className="p-4">User</th>
+                  <th className="p-4">Rating</th>
+                  <th className="p-4">Comment</th>
+                  <th className="p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60 text-sm">
+                {reviews.length > 0 ? (
+                  reviews.map((rev) => (
+                    <tr
+                      key={rev._id}
+                      className="hover:bg-gray-850/50 transition"
+                    >
+                      <td className="p-4 font-semibold text-gray-200">
+                        {rev.user?.name || "Anonymous"}{" "}
+                        <span className="text-xs text-gray-400 block">
+                          {rev.user?.email}
+                        </span>
+                      </td>
+                      <td className="p-4 text-amber-400 font-bold">
+                        {"★".repeat(rev.rating)}
+                        {"☆".repeat(5 - rev.rating)} ({rev.rating}/5)
+                      </td>
+                      <td className="p-4 text-gray-300">{rev.comment}</td>
+                      <td className="p-4">
+                        <button
+                          onClick={() => handleDeleteReview(rev._id)}
+                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
+                        >
+                          Delete Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-gray-500">
+                      No user reviews found for moderation.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         {/* User Management Section */}
         <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
