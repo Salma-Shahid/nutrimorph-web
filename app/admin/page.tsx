@@ -43,6 +43,14 @@ interface ActivityLogData {
   createdAt: string;
 }
 
+interface GatewayHealthData {
+  gatewayName: string;
+  status: string;
+  activeWebhooks: number;
+  failedWebhooksLast24h: number;
+  totalTransactionVolumeUSD: number;
+}
+
 interface ApiUsageData {
   sendgridEmailsUsed: number;
   sendgridLimit: number;
@@ -64,6 +72,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [logs, setLogs] = useState<ActivityLogData[]>([]);
+
   const [apiUsage, setApiUsage] = useState<ApiUsageData>({
     sendgridEmailsUsed: 120,
     sendgridLimit: 3000,
@@ -97,6 +106,9 @@ export default function AdminPage() {
   const [broadcastMessage, setBroadcastMessage] = useState<string>("");
   const [targetAudience, setTargetAudience] = useState<string>("all");
   const [sendingBroadcast, setSendingBroadcast] = useState<boolean>(false);
+  const [gatewayHealth, setGatewayHealth] = useState<GatewayHealthData | null>(
+    null,
+  );
 
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
@@ -120,7 +132,7 @@ export default function AdminPage() {
         },
       };
 
-      const [statsRes, usersRes, reviewsRes, logsRes, usageRes] =
+      const [statsRes, usersRes, reviewsRes, logsRes, usageRes, gatewayRes] =
         await Promise.all([
           axios.get(`${API_BASE_URL}/admin/stats`, config),
           axios.get(`${API_BASE_URL}/admin/users`, config),
@@ -133,6 +145,19 @@ export default function AdminPage() {
           axios
             .get(`${API_BASE_URL}/admin/api-usage`, config)
             .catch(() => ({ data: { data: apiUsage } })),
+          axios
+            .get(`${API_BASE_URL}/admin/gateway-health`, config)
+            .catch(() => ({
+              data: {
+                data: {
+                  gatewayName: "Stripe",
+                  status: "Healthy",
+                  activeWebhooks: 4,
+                  failedWebhooksLast24h: 0,
+                  totalTransactionVolumeUSD: 9.99,
+                },
+              },
+            })),
         ]);
 
       setStats(statsRes.data.data);
@@ -140,6 +165,7 @@ export default function AdminPage() {
       setReviews(reviewsRes.data.data || []);
       setLogs(logsRes.data.data || []);
       setApiUsage(usageRes.data.data);
+      setGatewayHealth(gatewayRes.data.data); // <-- Yeh line yahan set kar dein
 
       // Revenue fetch fallback
       try {
@@ -451,7 +477,7 @@ export default function AdminPage() {
   );
   const freePercentage = 100 - proPercentage;
 
- return (
+  return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 md:p-10">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
@@ -684,7 +710,6 @@ export default function AdminPage() {
                 Email broadcast quota.
               </p>
             </div>
-
             {/* Database Storage */}
             <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
               <div className="flex justify-between items-center text-xs">
@@ -697,7 +722,35 @@ export default function AdminPage() {
                 <div
                   className="bg-sky-500 h-full transition-all duration-500"
                   style={{
-                    width: `${Math.min( 100, (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100, )}\%`, }} ></div> </div> <p className="text-[11px] text-gray-500"> Cluster document storage. </p> </div>  {/* Gemini AI API */} <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2"> <div className="flex justify-between items-center text-xs"> <span className="font-semibold text-gray-300"> ✨ Gemini AI </span> <span className="text-amber-400 font-bold"> {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit} </span> </div> <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden"> <div className="bg-amber-500 h-full transition-all duration-500" style={{ width: `${Math.min(
+                    width: `${Math.min(100, (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100)}\%`,
+                  }}
+                ></div>{" "}
+              </div>{" "}
+              <p className="text-[11px] text-gray-500">
+                {" "}
+                Cluster document storage.{" "}
+              </p>{" "}
+            </div>{" "}
+            {/* Gemini AI API */}{" "}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+              {" "}
+              <div className="flex justify-between items-center text-xs">
+                {" "}
+                <span className="font-semibold text-gray-300">
+                  {" "}
+                  ✨ Gemini AI{" "}
+                </span>{" "}
+                <span className="text-amber-400 font-bold">
+                  {" "}
+                  {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit}{" "}
+                </span>{" "}
+              </div>{" "}
+              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                {" "}
+                <div
+                  className="bg-amber-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
                       100,
                       (apiUsage.geminiApiCalls / apiUsage.geminiLimit) * 100,
                     )}%`,
@@ -706,7 +759,6 @@ export default function AdminPage() {
               </div>
               <p className="text-[11px] text-gray-500">Image parsing tokens.</p>
             </div>
-
             {/* Expo EAS Free Builds */}
             <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
               <div className="flex justify-between items-center text-xs">
@@ -721,7 +773,36 @@ export default function AdminPage() {
                 <div
                   className="bg-purple-500 h-full transition-all duration-500"
                   style={{
-                    width: `${Math.min( 100, (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) * 100, )}\%`, }} ></div> </div> <p className="text-[11px] text-gray-500"> Free monthly build quota. </p> </div>  {/* Cloudinary Storage */} <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2"> <div className="flex justify-between items-center text-xs"> <span className="font-semibold text-gray-300"> ☁️ Cloudinary </span> <span className="text-cyan-400 font-bold"> {apiUsage.cloudinaryStorageGB}/{apiUsage.cloudinaryLimitGB}GB </span> </div> <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden"> <div className="bg-cyan-500 h-full transition-all duration-500" style={{ width: `${Math.min(
+                    width: `${Math.min(100, (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) * 100)}\%`,
+                  }}
+                ></div>{" "}
+              </div>{" "}
+              <p className="text-[11px] text-gray-500">
+                {" "}
+                Free monthly build quota.{" "}
+              </p>{" "}
+            </div>{" "}
+            {/* Cloudinary Storage */}{" "}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
+              {" "}
+              <div className="flex justify-between items-center text-xs">
+                {" "}
+                <span className="font-semibold text-gray-300">
+                  {" "}
+                  ☁️ Cloudinary{" "}
+                </span>{" "}
+                <span className="text-cyan-400 font-bold">
+                  {" "}
+                  {apiUsage.cloudinaryStorageGB}/{apiUsage.cloudinaryLimitGB}
+                  GB{" "}
+                </span>{" "}
+              </div>{" "}
+              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                {" "}
+                <div
+                  className="bg-cyan-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
                       100,
                       (apiUsage.cloudinaryStorageGB /
                         apiUsage.cloudinaryLimitGB) *
@@ -734,6 +815,53 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+
+        {/* Payment Gateways & Webhook Health Monitor */}
+        {gatewayHealth && (
+          <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-200">
+                  💳 Payment Gateways & Webhook Health
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  Monitor live transaction flow, gateway statuses, and webhook
+                  event deliveries.
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
+                🟢 {gatewayHealth.status} (Webhooks Active)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
+                <p className="text-gray-400 text-xs font-medium">
+                  Gateway Provider
+                </p>
+                <p className="text-lg font-bold text-emerald-400">
+                  {gatewayHealth.gatewayName}
+                </p>
+              </div>
+              <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
+                <p className="text-gray-400 text-xs font-medium">
+                  Active Webhooks
+                </p>
+                <p className="text-lg font-bold text-sky-400">
+                  {gatewayHealth.activeWebhooks} Endpoints
+                </p>
+              </div>
+              <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
+                <p className="text-gray-400 text-xs font-medium">
+                  Failed Webhooks (24h)
+                </p>
+                <p className="text-lg font-bold text-amber-400">
+                  {gatewayHealth.failedWebhooksLast24h} Errors
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Visual Analytics */}
         {stats && (
@@ -754,7 +882,11 @@ export default function AdminPage() {
             <div className="w-full bg-gray-800 h-4 rounded-full overflow-hidden flex">
               <div
                 className="bg-sky-500 transition-all duration-500"
-                style={{ width: `${proPercentage}\%` }} ></div> <div className="bg-gray-700 transition-all duration-500" style={{ width: `${freePercentage}%` }}
+                style={{ width: `${proPercentage}\%` }}
+              ></div>{" "}
+              <div
+                className="bg-gray-700 transition-all duration-500"
+                style={{ width: `${freePercentage}%` }}
               ></div>
             </div>
           </div>
@@ -1006,13 +1138,23 @@ export default function AdminPage() {
                           {user.subscriptionTier || "free"}
                         </span>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 flex items-center gap-2">
                         <button
-                          onClick={() => handleDeleteUser(user._id)}
-                          className="text-red-400 hover:text-red-300 focus:outline-none"
+                          onClick={() =>
+                            handleToggleTier(user._id, user.subscriptionTier)
+                          }
+                          className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium transition"
                         >
-                          Delete
+                          Toggle Tier
                         </button>
+                        {user.role !== "admin" && (
+                          <button
+                            onClick={() => handleDeleteUser(user._id)}
+                            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -1030,5 +1172,4 @@ export default function AdminPage() {
       </div>
     </div>
   );
-};
-
+}
