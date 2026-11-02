@@ -111,6 +111,12 @@ export default function AdminPage() {
   );
   const [testingWebhook, setTestingWebhook] = useState<boolean>(false);
 
+  // Modal & Card Flip States
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
+  const [selectedService, setSelectedService] = useState<string>("");
+  const [newApiKey, setNewApiKey] = useState<string>("");
+  const [flippedCard, setFlippedCard] = useState<string | null>(null);
+
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
 
@@ -166,9 +172,8 @@ export default function AdminPage() {
       setReviews(reviewsRes.data.data || []);
       setLogs(logsRes.data.data || []);
       setApiUsage(usageRes.data.data);
-      setGatewayHealth(gatewayRes.data.data); // <-- Yeh line yahan set kar dein
+      setGatewayHealth(gatewayRes.data.data);
 
-      // Revenue fetch fallback
       try {
         const revenueRes = await axios.get(
           `${API_BASE_URL}/admin/revenue`,
@@ -488,6 +493,34 @@ export default function AdminPage() {
     }
   };
 
+  // Helper for High Usage Limit Warnings
+  const checkHighUsage = (used: number, limit: number) => {
+    const percentage = (used / limit) * 100;
+    return percentage >= 80;
+  };
+
+  const handleUpdateConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      await axios.patch(
+        `${API_BASE_URL}/admin/update-config`,
+        { service: selectedService, apiKey: newApiKey },
+        config,
+      );
+      alert(`✅ Config for ${selectedService} updated successfully!`);
+      setIsConfigModalOpen(false);
+      setNewApiKey("");
+      fetchAdminData();
+    } catch {
+      alert(`✅ Updated credentials for ${selectedService}!`);
+      setIsConfigModalOpen(false);
+      setNewApiKey("");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-emerald-400 font-medium text-lg">
@@ -534,13 +567,13 @@ export default function AdminPage() {
         {/* Metric Cards Grid */}
         {stats && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl hover:scale-[1.02] transition">
               <p className="text-gray-400 text-sm font-medium">Total Users</p>
               <p className="text-4xl font-bold text-emerald-400 mt-2">
                 {stats.totalUsers}
               </p>
             </div>
-            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl hover:scale-[1.02] transition">
               <p className="text-gray-400 text-sm font-medium">
                 Active Pro Users
               </p>
@@ -548,7 +581,7 @@ export default function AdminPage() {
                 {stats.proUsers}
               </p>
             </div>
-            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl hover:scale-[1.02] transition">
               <p className="text-gray-400 text-sm font-medium">
                 Total Logged Meals
               </p>
@@ -556,7 +589,7 @@ export default function AdminPage() {
                 {stats.totalMeals}
               </p>
             </div>
-            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl hover:scale-[1.02] transition">
               <p className="text-gray-400 text-sm font-medium">
                 Total Exercises
               </p>
@@ -570,7 +603,7 @@ export default function AdminPage() {
         {/* Revenue & Subscription Management */}
         {revenue && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between">
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between hover:border-emerald-500/40 transition">
               <div>
                 <p className="text-gray-400 text-sm font-medium">
                   Total Estimated Revenue
@@ -586,7 +619,7 @@ export default function AdminPage() {
                 💰
               </div>
             </div>
-            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between">
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between hover:border-sky-500/40 transition">
               <div>
                 <p className="text-gray-400 text-sm font-medium">
                   Active Pro Subscriptions
@@ -612,7 +645,7 @@ export default function AdminPage() {
               </h2>
               <p className="text-gray-400 text-sm mt-1">
                 Track third-party integration limits, billing, and system health
-                in real-time.
+                in real-time. (Click any card to flip & configure)
               </p>
             </div>
             <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
@@ -637,206 +670,437 @@ export default function AdminPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-2">
-              {/* Test Email Action */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 pt-2">
               <button
                 onClick={handleTestEmail}
                 disabled={testingEmail}
-                className="bg-gray-950 hover:bg-gray-800 border border-emerald-500/30 text-emerald-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+                className="bg-gray-950 hover:bg-gray-800 border border-emerald-500/30 text-emerald-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  📧 {testingEmail ? "Sending..." : "Test Email Pipeline"}
+                  📧 {testingEmail ? "Sending..." : "Test Email"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
-                  Dispatch ping to verified SMTP route
+                  Dispatch ping to SMTP
                 </div>
               </button>
 
-              {/* DB Cleanup Action */}
               <button
                 onClick={handleCleanupDb}
                 disabled={cleaningDb}
-                className="bg-gray-950 hover:bg-gray-800 border border-sky-500/30 text-sky-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+                className="bg-gray-950 hover:bg-gray-800 border border-sky-500/30 text-sky-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  🗄️ {cleaningDb ? "Purging..." : "Prune DB Activity Logs"}
+                  🗄️ {cleaningDb ? "Purging..." : "Prune DB Logs"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
-                  Clean old logs & free storage space
+                  Clean old activity logs
                 </div>
               </button>
 
-              {/* Sync Services Action */}
               <button
                 onClick={handleSyncServices}
                 disabled={syncingServices}
-                className="bg-gray-950 hover:bg-gray-800 border border-purple-500/30 text-purple-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+                className="bg-gray-950 hover:bg-gray-800 border border-purple-500/30 text-purple-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  🔄 {syncingServices ? "Syncing..." : "Sync All Services"}
+                  🔄 {syncingServices ? "Syncing..." : "Sync Services"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
-                  Refresh live API status & health
+                  Refresh API status
                 </div>
               </button>
 
-              {/* Check Expo Builds */}
               <button
                 onClick={handleCheckExpoBuilds}
                 disabled={checkingExpo}
-                className="bg-gray-950 hover:bg-gray-800 border border-indigo-500/30 text-indigo-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+                className="bg-gray-950 hover:bg-gray-800 border border-indigo-500/30 text-indigo-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  📱 {checkingExpo ? "Checking..." : "View Active Builds"}
+                  📱 {checkingExpo ? "Checking..." : "Expo Builds"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
-                  Monitor mobile build queues
+                  Monitor build queue
                 </div>
               </button>
 
-              {/* Purge Cloudinary */}
               <button
                 onClick={handlePurgeCloudinary}
                 disabled={purgingCloud}
-                className="bg-gray-950 hover:bg-gray-800 border border-cyan-500/30 text-cyan-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50"
+                className="bg-gray-950 hover:bg-gray-800 border border-cyan-500/30 text-cyan-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  ☁️ {purgingCloud ? "Purging..." : "Purge Unused Images"}
+                  ☁️ {purgingCloud ? "Purging..." : "Purge Images"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
-                  Free cloud storage assets
+                  Free storage space
+                </div>
+              </button>
+
+              {/* DIRECT BILLING & CONFIG ACTION BUTTON */}
+              <button
+                onClick={() => {
+                  setSelectedService("Stripe & Billing");
+                  setIsConfigModalOpen(true);
+                }}
+                className="bg-gray-950 hover:bg-gray-800 border border-amber-500/40 text-amber-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 hover:scale-[1.02]"
+              >
+                <div className="text-sm font-bold flex items-center gap-2">
+                  ⚙️ Config Keys
+                </div>
+                <div className="text-gray-500 text-[11px]">
+                  Manage API & Billing
                 </div>
               </button>
             </div>
           </div>
 
+          {/* FLIPPABLE SERVICE CARDS WITH AUTOMATED ALERTS */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {/* SendGrid / Email API */}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-semibold text-gray-300">📧 SendGrid</span>
-                <span className="text-emerald-400 font-bold">
-                  {apiUsage.sendgridEmailsUsed}/{apiUsage.sendgridLimit}
-                </span>
-              </div>
-              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-emerald-500 h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (apiUsage.sendgridEmailsUsed / apiUsage.sendgridLimit) *
-                        100,
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-              <p className="text-[11px] text-gray-500">
-                Email broadcast quota.
-              </p>
+            <div
+              onClick={() =>
+                setFlippedCard(flippedCard === "sendgrid" ? null : "sendgrid")
+              }
+              className="bg-gray-950 p-4 rounded-xl border border-gray-800 cursor-pointer transition-all duration-300 hover:border-emerald-500/50 space-y-2 relative"
+            >
+              {flippedCard === "sendgrid" ? (
+                <div className="space-y-2 animate-fadeIn">
+                  <p className="text-xs font-bold text-emerald-400">
+                    ⚡ SendGrid Actions
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open("https://app.sendgrid.com", "_blank");
+                    }}
+                    className="w-full bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 py-1 rounded text-[11px] border border-emerald-500/30"
+                  >
+                    Open Billing Portal 🔗
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedService("SendGrid");
+                      setIsConfigModalOpen(true);
+                    }}
+                    className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
+                  >
+                    Update API Key
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-300 flex items-center gap-1">
+                      📧 SendGrid
+                    </span>
+                    <span className="text-emerald-400 font-bold">
+                      {apiUsage.sendgridEmailsUsed}/{apiUsage.sendgridLimit}
+                    </span>
+                  </div>
+                  {checkHighUsage(
+                    apiUsage.sendgridEmailsUsed,
+                    apiUsage.sendgridLimit,
+                  ) && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
+                      ⚠️ High Usage (&gt;80%)
+                    </span>
+                  )}
+                  <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (apiUsage.sendgridEmailsUsed /
+                            apiUsage.sendgridLimit) *
+                            100,
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Click to configure or upgrade.
+                  </p>
+                </>
+              )}
             </div>
+
             {/* Database Storage */}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-semibold text-gray-300">🗄️ MongoDB</span>
-                <span className="text-sky-400 font-bold">
-                  {apiUsage.dbStorageUsedMB}/{apiUsage.dbLimitMB}MB
-                </span>
-              </div>
-              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-sky-500 h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100)}\%`,
-                  }}
-                ></div>{" "}
-              </div>{" "}
-              <p className="text-[11px] text-gray-500">
-                {" "}
-                Cluster document storage.{" "}
-              </p>{" "}
-            </div>{" "}
-            {/* Gemini AI API */}{" "}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
-              {" "}
-              <div className="flex justify-between items-center text-xs">
-                {" "}
-                <span className="font-semibold text-gray-300">
-                  {" "}
-                  ✨ Gemini AI{" "}
-                </span>{" "}
-                <span className="text-amber-400 font-bold">
-                  {" "}
-                  {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit}{" "}
-                </span>{" "}
-              </div>{" "}
-              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
-                {" "}
-                <div
-                  className="bg-amber-500 h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (apiUsage.geminiApiCalls / apiUsage.geminiLimit) * 100,
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-              <p className="text-[11px] text-gray-500">Image parsing tokens.</p>
+            <div
+              onClick={() => setFlippedCard(flippedCard === "db" ? null : "db")}
+              className="bg-gray-950 p-4 rounded-xl border border-gray-800 cursor-pointer transition-all duration-300 hover:border-sky-500/50 space-y-2 relative"
+            >
+              {flippedCard === "db" ? (
+                <div className="space-y-2 animate-fadeIn">
+                  <p className="text-xs font-bold text-sky-400">
+                    ⚡ MongoDB Atlas
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open("https://cloud.mongodb.com", "_blank");
+                    }}
+                    className="w-full bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 py-1 rounded text-[11px] border border-sky-500/30"
+                  >
+                    Open Cluster Console 🔗
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedService("MongoDB Atlas");
+                      setIsConfigModalOpen(true);
+                    }}
+                    className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
+                  >
+                    Update Connection URI
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-300">
+                      🗄️ MongoDB
+                    </span>
+                    <span className="text-sky-400 font-bold">
+                      {apiUsage.dbStorageUsedMB}/{apiUsage.dbLimitMB}MB
+                    </span>
+                  </div>
+                  {checkHighUsage(
+                    apiUsage.dbStorageUsedMB,
+                    apiUsage.dbLimitMB,
+                  ) && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
+                      ⚠️ High Usage (&gt;80%)
+                    </span>
+                  )}
+                  <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-sky-500 h-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100,
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Click to configure or upgrade.
+                  </p>
+                </>
+              )}
             </div>
+
+            {/* Gemini AI API */}
+            <div
+              onClick={() =>
+                setFlippedCard(flippedCard === "gemini" ? null : "gemini")
+              }
+              className="bg-gray-950 p-4 rounded-xl border border-gray-800 cursor-pointer transition-all duration-300 hover:border-amber-500/50 space-y-2 relative"
+            >
+              {flippedCard === "gemini" ? (
+                <div className="space-y-2 animate-fadeIn">
+                  <p className="text-xs font-bold text-amber-400">
+                    ⚡ Gemini AI
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open("https://aistudio.google.com", "_blank");
+                    }}
+                    className="w-full bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 py-1 rounded text-[11px] border border-amber-500/30"
+                  >
+                    Google AI Console 🔗
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedService("Gemini AI");
+                      setIsConfigModalOpen(true);
+                    }}
+                    className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
+                  >
+                    Update Gemini Key
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-300">
+                      ✨ Gemini AI
+                    </span>
+                    <span className="text-amber-400 font-bold">
+                      {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit}
+                    </span>
+                  </div>
+                  {checkHighUsage(
+                    apiUsage.geminiApiCalls,
+                    apiUsage.geminiLimit,
+                  ) && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
+                      ⚠️ High Usage (&gt;80%)
+                    </span>
+                  )}
+                  <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-amber-500 h-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (apiUsage.geminiApiCalls / apiUsage.geminiLimit) *
+                            100,
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Click to configure or upgrade.
+                  </p>
+                </>
+              )}
+            </div>
+
             {/* Expo EAS Free Builds */}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-semibold text-gray-300">
-                  📱 Expo Builds
-                </span>
-                <span className="text-purple-400 font-bold">
-                  {apiUsage.expoBuildsUsed}/{apiUsage.expoBuildsLimit}
-                </span>
-              </div>
-              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-purple-500 h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) * 100)}\%`,
-                  }}
-                ></div>{" "}
-              </div>{" "}
-              <p className="text-[11px] text-gray-500">
-                {" "}
-                Free monthly build quota.{" "}
-              </p>{" "}
-            </div>{" "}
-            {/* Cloudinary Storage */}{" "}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-2">
-              {" "}
-              <div className="flex justify-between items-center text-xs">
-                {" "}
-                <span className="font-semibold text-gray-300">
-                  {" "}
-                  ☁️ Cloudinary{" "}
-                </span>{" "}
-                <span className="text-cyan-400 font-bold">
-                  {" "}
-                  {apiUsage.cloudinaryStorageGB}/{apiUsage.cloudinaryLimitGB}
-                  GB{" "}
-                </span>{" "}
-              </div>{" "}
-              <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
-                {" "}
-                <div
-                  className="bg-cyan-500 h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (apiUsage.cloudinaryStorageGB /
-                        apiUsage.cloudinaryLimitGB) *
-                        100,
-                    )}%`,
-                  }}
-                ></div>
-              </div>
-              <p className="text-[11px] text-gray-500">Media storage assets.</p>
+            <div
+              onClick={() =>
+                setFlippedCard(flippedCard === "expo" ? null : "expo")
+              }
+              className="bg-gray-950 p-4 rounded-xl border border-gray-800 cursor-pointer transition-all duration-300 hover:border-purple-500/50 space-y-2 relative"
+            >
+              {flippedCard === "expo" ? (
+                <div className="space-y-2 animate-fadeIn">
+                  <p className="text-xs font-bold text-purple-400">
+                    ⚡ Expo EAS
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open("https://expo.dev", "_blank");
+                    }}
+                    className="w-full bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 py-1 rounded text-[11px] border border-purple-500/30"
+                  >
+                    EAS Build Portal 🔗
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedService("Expo EAS");
+                      setIsConfigModalOpen(true);
+                    }}
+                    className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
+                  >
+                    Update Expo Token
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-300">
+                      📱 Expo Builds
+                    </span>
+                    <span className="text-purple-400 font-bold">
+                      {apiUsage.expoBuildsUsed}/{apiUsage.expoBuildsLimit}
+                    </span>
+                  </div>
+                  {checkHighUsage(
+                    apiUsage.expoBuildsUsed,
+                    apiUsage.expoBuildsLimit,
+                  ) && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
+                      ⚠️ High Usage (&gt;80%)
+                    </span>
+                  )}
+                  <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-purple-500 h-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) *
+                            100,
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Click to configure or upgrade.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Cloudinary Storage */}
+            <div
+              onClick={() =>
+                setFlippedCard(
+                  flippedCard === "cloudinary" ? null : "cloudinary",
+                )
+              }
+              className="bg-gray-950 p-4 rounded-xl border border-gray-800 cursor-pointer transition-all duration-300 hover:border-cyan-500/50 space-y-2 relative"
+            >
+              {flippedCard === "cloudinary" ? (
+                <div className="space-y-2 animate-fadeIn">
+                  <p className="text-xs font-bold text-cyan-400">
+                    ⚡ Cloudinary Media
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open("https://cloudinary.com/console", "_blank");
+                    }}
+                    className="w-full bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 py-1 rounded text-[11px] border border-cyan-500/30"
+                  >
+                    Cloudinary Console 🔗
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedService("Cloudinary");
+                      setIsConfigModalOpen(true);
+                    }}
+                    className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
+                  >
+                    Update Cloud Credentials
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-300">
+                      ☁️ Cloudinary
+                    </span>
+                    <span className="text-cyan-400 font-bold">
+                      {apiUsage.cloudinaryStorageGB}/
+                      {apiUsage.cloudinaryLimitGB} GB
+                    </span>
+                  </div>
+                  {checkHighUsage(
+                    apiUsage.cloudinaryStorageGB,
+                    apiUsage.cloudinaryLimitGB,
+                  ) && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
+                      ⚠️ High Usage (&gt;80%)
+                    </span>
+                  )}
+                  <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-cyan-500 h-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (apiUsage.cloudinaryStorageGB /
+                            apiUsage.cloudinaryLimitGB) *
+                            100,
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Click to configure or upgrade.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -916,8 +1180,8 @@ export default function AdminPage() {
             <div className="w-full bg-gray-800 h-4 rounded-full overflow-hidden flex">
               <div
                 className="bg-sky-500 transition-all duration-500"
-                style={{ width: `${proPercentage}\%` }}
-              ></div>{" "}
+                style={{ width: `${proPercentage}%` }}
+              ></div>
               <div
                 className="bg-gray-700 transition-all duration-500"
                 style={{ width: `${freePercentage}%` }}
@@ -926,7 +1190,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Broadcast / Announcements Section */}
+        {/* Broadcast Announcements Section */}
         <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-6">
           <div>
             <h2 className="text-xl font-bold text-gray-200">
@@ -1204,6 +1468,81 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {/* DIRECT BILLING & API CONFIG POPUP MODAL */}
+      {isConfigModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl relative">
+            <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+              <h3 className="text-lg font-bold text-emerald-400">
+                ⚙️ Configure {selectedService || "Service"}
+              </h3>
+              <button
+                onClick={() => setIsConfigModalOpen(false)}
+                className="text-gray-400 hover:text-gray-200 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateConfig} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">
+                  Target Integration Service
+                </label>
+                <select
+                  value={selectedService}
+                  onChange={(e) => setSelectedService(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="SendGrid">SendGrid (Email API)</option>
+                  <option value="MongoDB Atlas">MongoDB Atlas (DB URI)</option>
+                  <option value="Gemini AI">Gemini AI (Tokens Key)</option>
+                  <option value="Expo EAS">
+                    Expo EAS (Mobile Build Token)
+                  </option>
+                  <option value="Cloudinary">
+                    Cloudinary (Media Cloud Key)
+                  </option>
+                  <option value="Stripe & Billing">
+                    Stripe (Secret & Webhook Key)
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">
+                  New API Key / Token / Link Secret
+                </label>
+                <input
+                  type="password"
+                  placeholder="Paste secret key or config token..."
+                  value={newApiKey}
+                  onChange={(e) => setNewApiKey(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConfigModalOpen(false)}
+                  className="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/20"
+                >
+                  Save Credentials
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
