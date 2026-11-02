@@ -109,6 +109,7 @@ export default function AdminPage() {
   const [gatewayHealth, setGatewayHealth] = useState<GatewayHealthData | null>(
     null,
   );
+  const [testingWebhook, setTestingWebhook] = useState<boolean>(false);
 
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
@@ -460,6 +461,30 @@ export default function AdminPage() {
       alert("⚠️ Expo Build Error: " + errorMsg);
     } finally {
       setCheckingExpo(false);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    try {
+      setTestingWebhook(true);
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/admin/test-webhook`,
+        {},
+        config,
+      );
+      alert("✅ Webhook Status: " + (res.data.message || "Ping test passed!"));
+      fetchAdminData();
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : "Failed to test webhook.");
+      alert("⚠️ Webhook Error: " + errorMsg);
+    } finally {
+      setTestingWebhook(false);
     }
   };
 
@@ -829,9 +854,18 @@ export default function AdminPage() {
                   event deliveries.
                 </p>
               </div>
-              <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
-                🟢 {gatewayHealth.status} (Webhooks Active)
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
+                  🟢 {gatewayHealth.status} (Webhooks Active)
+                </span>
+                <button
+                  onClick={handleTestWebhook}
+                  disabled={testingWebhook}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold px-4 py-1.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {testingWebhook ? "Testing..." : "⚡ Test Webhook Ping"}
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
