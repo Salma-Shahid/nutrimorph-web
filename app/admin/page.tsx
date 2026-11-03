@@ -127,9 +127,7 @@ export default function AdminPage() {
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
       if (!token) {
-        setError("Admin authentication token missing. Please log in first.");
-        setLoading(false);
-        setRefreshing(false);
+        window.location.replace("/");
         return;
       }
 
@@ -138,6 +136,13 @@ export default function AdminPage() {
           Authorization: `Bearer ${token}`,
         },
       };
+
+      const profileRes = await axios.get(`${API_BASE_URL}/auth/me`, config);
+      const profile = profileRes.data?.user || profileRes.data;
+      if (profile?.role !== "admin") {
+        window.location.replace("/");
+        return;
+      }
 
       const [statsRes, usersRes, reviewsRes, logsRes, usageRes, gatewayRes] =
         await Promise.all([
@@ -189,6 +194,13 @@ export default function AdminPage() {
         });
       }
     } catch (err: unknown) {
+      const status = (
+        err as { response?: { status?: number } }
+      )?.response?.status;
+      if (status === 401 || status === 403) {
+        window.location.replace("/");
+        return;
+      }
       console.error("Admin Fetch Error:", err);
       const errorMsg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
@@ -341,14 +353,14 @@ export default function AdminPage() {
         config,
       );
       alert(
-        "✅ Success: " + (res.data.message || "Test email sent successfully!"),
+        "Success: " + (res.data.message || "Test email sent successfully!"),
       );
     } catch (err: unknown) {
       const errorMsg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ||
         (err instanceof Error ? err.message : "Failed to send test email.");
-      alert("⚠️ Test Email Error: " + errorMsg);
+      alert("Test email error: " + errorMsg);
     } finally {
       setTestingEmail(false);
     }
@@ -372,7 +384,7 @@ export default function AdminPage() {
         config,
       );
       alert(
-        "✅ Database Cleanup: " +
+        "Database cleanup: " +
           (res.data.message || "Cleanup completed successfully!"),
       );
       fetchAdminData();
@@ -381,7 +393,7 @@ export default function AdminPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ||
         (err instanceof Error ? err.message : "Failed to clean up database.");
-      alert("⚠️ Cleanup Error: " + errorMsg);
+      alert("Cleanup error: " + errorMsg);
     } finally {
       setCleaningDb(false);
     }
@@ -399,7 +411,7 @@ export default function AdminPage() {
         config,
       );
       alert(
-        "✅ Services Synced: " +
+        "Services synced: " +
           (res.data.message || "All integration pipelines active!"),
       );
       fetchAdminData();
@@ -408,7 +420,7 @@ export default function AdminPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ||
         (err instanceof Error ? err.message : "Failed to sync services.");
-      alert("⚠️ Sync Error: " + errorMsg);
+      alert("Sync error: " + errorMsg);
     } finally {
       setSyncingServices(false);
     }
@@ -432,7 +444,7 @@ export default function AdminPage() {
         config,
       );
       alert(
-        "✅ Cloudinary Success: " +
+        "Cloudinary success: " +
           (res.data.message || "Storage space freed!"),
       );
       fetchAdminData();
@@ -441,7 +453,7 @@ export default function AdminPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ||
         (err instanceof Error ? err.message : "Failed to purge cloud storage.");
-      alert("⚠️ Cloudinary Error: " + errorMsg);
+      alert("Cloudinary error: " + errorMsg);
     } finally {
       setPurgingCloud(false);
     }
@@ -455,7 +467,7 @@ export default function AdminPage() {
 
       const res = await axios.get(`${API_BASE_URL}/admin/expo-builds`, config);
       alert(
-        "📱 Expo EAS Status: " +
+        "Expo EAS status: " +
           (res.data.message || "Build queues checked successfully!"),
       );
     } catch (err: unknown) {
@@ -463,7 +475,7 @@ export default function AdminPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ||
         (err instanceof Error ? err.message : "Failed to check Expo builds.");
-      alert("⚠️ Expo Build Error: " + errorMsg);
+      alert("Expo build error: " + errorMsg);
     } finally {
       setCheckingExpo(false);
     }
@@ -480,14 +492,14 @@ export default function AdminPage() {
         {},
         config,
       );
-      alert("✅ Webhook Status: " + (res.data.message || "Ping test passed!"));
+      alert("Webhook status: " + (res.data.message || "Ping test passed!"));
       fetchAdminData();
     } catch (err: unknown) {
       const errorMsg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ||
         (err instanceof Error ? err.message : "Failed to test webhook.");
-      alert("⚠️ Webhook Error: " + errorMsg);
+      alert("Webhook error: " + errorMsg);
     } finally {
       setTestingWebhook(false);
     }
@@ -510,12 +522,12 @@ export default function AdminPage() {
         { service: selectedService, apiKey: newApiKey },
         config,
       );
-      alert(`✅ Config for ${selectedService} updated successfully!`);
+      alert(`Configuration for ${selectedService} updated successfully!`);
       setIsConfigModalOpen(false);
       setNewApiKey("");
       fetchAdminData();
     } catch {
-      alert(`✅ Updated credentials for ${selectedService}!`);
+      alert(`Credentials for ${selectedService} updated successfully.`);
       setIsConfigModalOpen(false);
       setNewApiKey("");
     }
@@ -542,7 +554,7 @@ export default function AdminPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-6">
           <div>
             <h1 className="text-3xl font-extrabold text-emerald-400">
-              NutriMorph Admin Portal 👑
+              NutriMorph Admin Portal
             </h1>
             <p className="text-gray-400 text-sm mt-1">
               Live system stats, user accounts, and tier management.
@@ -553,14 +565,14 @@ export default function AdminPage() {
             disabled={refreshing}
             className="self-start md:self-auto bg-gray-800 hover:bg-gray-700 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 disabled:opacity-50 shadow-lg"
           >
-            <span className={refreshing ? "animate-spin" : ""}>🔄</span>
+            <span className={refreshing ? "animate-spin" : ""}>Refresh</span>
             {refreshing ? "Refreshing..." : "Refresh Data"}
           </button>
         </div>
 
         {error && (
           <div className="bg-red-900/40 border border-red-500/50 text-red-200 p-4 rounded-xl text-sm">
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
@@ -616,7 +628,7 @@ export default function AdminPage() {
                 </p>
               </div>
               <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 text-emerald-400 text-2xl">
-                💰
+                $
               </div>
             </div>
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between hover:border-sky-500/40 transition">
@@ -630,7 +642,7 @@ export default function AdminPage() {
                 </p>
               </div>
               <div className="bg-sky-500/10 p-4 rounded-xl border border-sky-500/20 text-sky-400 text-2xl">
-                ⭐
+                Pro
               </div>
             </div>
           </div>
@@ -641,7 +653,7 @@ export default function AdminPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-gray-200">
-                ⚡ API & Service Usage Monitor
+                API & Service Usage Monitor
               </h2>
               <p className="text-gray-400 text-sm mt-1">
                 Track third-party integration limits, billing, and system health
@@ -649,7 +661,7 @@ export default function AdminPage() {
               </p>
             </div>
             <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
-              🟢 All Systems Healthy
+              All Systems Healthy
             </span>
           </div>
 
@@ -658,7 +670,7 @@ export default function AdminPage() {
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div>
                 <h3 className="text-lg font-bold text-gray-200">
-                  ⚙️ Live Integration Control Panel
+                  Live Integration Control Panel
                 </h3>
                 <p className="text-gray-400 text-xs mt-0.5">
                   Perform live management and health checks across active
@@ -666,7 +678,7 @@ export default function AdminPage() {
                 </p>
               </div>
               <span className="text-xs text-amber-400 font-semibold bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
-                🔒 Admin Protected Actions
+                Admin Protected Actions
               </span>
             </div>
 
@@ -677,7 +689,7 @@ export default function AdminPage() {
                 className="bg-gray-950 hover:bg-gray-800 border border-emerald-500/30 text-emerald-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  📧 {testingEmail ? "Sending..." : "Test Email"}
+                  {testingEmail ? "Sending..." : "Test Email"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Dispatch ping to SMTP
@@ -690,7 +702,7 @@ export default function AdminPage() {
                 className="bg-gray-950 hover:bg-gray-800 border border-sky-500/30 text-sky-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  🗄️ {cleaningDb ? "Purging..." : "Prune DB Logs"}
+                  {cleaningDb ? "Purging..." : "Prune DB Logs"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Clean old activity logs
@@ -703,7 +715,7 @@ export default function AdminPage() {
                 className="bg-gray-950 hover:bg-gray-800 border border-purple-500/30 text-purple-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  🔄 {syncingServices ? "Syncing..." : "Sync Services"}
+                  {syncingServices ? "Syncing..." : "Sync Services"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Refresh API status
@@ -716,7 +728,7 @@ export default function AdminPage() {
                 className="bg-gray-950 hover:bg-gray-800 border border-indigo-500/30 text-indigo-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  📱 {checkingExpo ? "Checking..." : "Expo Builds"}
+                  {checkingExpo ? "Checking..." : "Expo Builds"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Monitor build queue
@@ -729,7 +741,7 @@ export default function AdminPage() {
                 className="bg-gray-950 hover:bg-gray-800 border border-cyan-500/30 text-cyan-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 disabled:opacity-50 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  ☁️ {purgingCloud ? "Purging..." : "Purge Images"}
+                  {purgingCloud ? "Purging..." : "Purge Images"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Free storage space
@@ -745,7 +757,7 @@ export default function AdminPage() {
                 className="bg-gray-950 hover:bg-gray-800 border border-amber-500/40 text-amber-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  ⚙️ Config Keys
+                  Config Keys
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Manage API & Billing
@@ -766,7 +778,7 @@ export default function AdminPage() {
               {flippedCard === "sendgrid" ? (
                 <div className="space-y-2 animate-fadeIn">
                   <p className="text-xs font-bold text-emerald-400">
-                    ⚡ SendGrid Actions
+                    SendGrid Actions
                   </p>
                   <button
                     onClick={(e) => {
@@ -775,7 +787,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 py-1 rounded text-[11px] border border-emerald-500/30"
                   >
-                    Open Billing Portal 🔗
+                    Open Billing Portal
                   </button>
                   <button
                     onClick={(e) => {
@@ -792,7 +804,7 @@ export default function AdminPage() {
                 <>
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-gray-300 flex items-center gap-1">
-                      📧 SendGrid
+                      SendGrid
                     </span>
                     <span className="text-emerald-400 font-bold">
                       {apiUsage.sendgridEmailsUsed}/{apiUsage.sendgridLimit}
@@ -803,7 +815,7 @@ export default function AdminPage() {
                     apiUsage.sendgridLimit,
                   ) && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
-                      ⚠️ High Usage (&gt;80%)
+                      High Usage (&gt;80%)
                     </span>
                   )}
                   <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
@@ -834,7 +846,7 @@ export default function AdminPage() {
               {flippedCard === "db" ? (
                 <div className="space-y-2 animate-fadeIn">
                   <p className="text-xs font-bold text-sky-400">
-                    ⚡ MongoDB Atlas
+                    MongoDB Atlas
                   </p>
                   <button
                     onClick={(e) => {
@@ -843,7 +855,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 py-1 rounded text-[11px] border border-sky-500/30"
                   >
-                    Open Cluster Console 🔗
+                    Open Cluster Console
                   </button>
                   <button
                     onClick={(e) => {
@@ -860,7 +872,7 @@ export default function AdminPage() {
                 <>
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-gray-300">
-                      🗄️ MongoDB
+                      MongoDB
                     </span>
                     <span className="text-sky-400 font-bold">
                       {apiUsage.dbStorageUsedMB}/{apiUsage.dbLimitMB}MB
@@ -871,7 +883,7 @@ export default function AdminPage() {
                     apiUsage.dbLimitMB,
                   ) && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
-                      ⚠️ High Usage (&gt;80%)
+                      High Usage (&gt;80%)
                     </span>
                   )}
                   <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
@@ -902,7 +914,7 @@ export default function AdminPage() {
               {flippedCard === "gemini" ? (
                 <div className="space-y-2 animate-fadeIn">
                   <p className="text-xs font-bold text-amber-400">
-                    ⚡ Gemini AI
+                    Gemini AI
                   </p>
                   <button
                     onClick={(e) => {
@@ -911,7 +923,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 py-1 rounded text-[11px] border border-amber-500/30"
                   >
-                    Google AI Console 🔗
+                    Google AI Console
                   </button>
                   <button
                     onClick={(e) => {
@@ -928,7 +940,7 @@ export default function AdminPage() {
                 <>
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-gray-300">
-                      ✨ Gemini AI
+                      Gemini AI
                     </span>
                     <span className="text-amber-400 font-bold">
                       {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit}
@@ -939,7 +951,7 @@ export default function AdminPage() {
                     apiUsage.geminiLimit,
                   ) && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
-                      ⚠️ High Usage (&gt;80%)
+                      High Usage (&gt;80%)
                     </span>
                   )}
                   <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
@@ -971,7 +983,7 @@ export default function AdminPage() {
               {flippedCard === "expo" ? (
                 <div className="space-y-2 animate-fadeIn">
                   <p className="text-xs font-bold text-purple-400">
-                    ⚡ Expo EAS
+                    Expo EAS
                   </p>
                   <button
                     onClick={(e) => {
@@ -980,7 +992,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 py-1 rounded text-[11px] border border-purple-500/30"
                   >
-                    EAS Build Portal 🔗
+                    EAS Build Portal
                   </button>
                   <button
                     onClick={(e) => {
@@ -997,7 +1009,7 @@ export default function AdminPage() {
                 <>
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-gray-300">
-                      📱 Expo Builds
+                      Expo Builds
                     </span>
                     <span className="text-purple-400 font-bold">
                       {apiUsage.expoBuildsUsed}/{apiUsage.expoBuildsLimit}
@@ -1008,7 +1020,7 @@ export default function AdminPage() {
                     apiUsage.expoBuildsLimit,
                   ) && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
-                      ⚠️ High Usage (&gt;80%)
+                      High Usage (&gt;80%)
                     </span>
                   )}
                   <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
@@ -1042,7 +1054,7 @@ export default function AdminPage() {
               {flippedCard === "cloudinary" ? (
                 <div className="space-y-2 animate-fadeIn">
                   <p className="text-xs font-bold text-cyan-400">
-                    ⚡ Cloudinary Media
+                    Cloudinary Media
                   </p>
                   <button
                     onClick={(e) => {
@@ -1051,7 +1063,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 py-1 rounded text-[11px] border border-cyan-500/30"
                   >
-                    Cloudinary Console 🔗
+                    Cloudinary Console
                   </button>
                   <button
                     onClick={(e) => {
@@ -1068,7 +1080,7 @@ export default function AdminPage() {
                 <>
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-gray-300">
-                      ☁️ Cloudinary
+                      Cloudinary
                     </span>
                     <span className="text-cyan-400 font-bold">
                       {apiUsage.cloudinaryStorageGB}/
@@ -1080,7 +1092,7 @@ export default function AdminPage() {
                     apiUsage.cloudinaryLimitGB,
                   ) && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
-                      ⚠️ High Usage (&gt;80%)
+                      High Usage (&gt;80%)
                     </span>
                   )}
                   <div className="w-full bg-gray-900 h-2 rounded-full overflow-hidden">
@@ -1111,7 +1123,7 @@ export default function AdminPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-200">
-                  💳 Payment Gateways & Webhook Health
+                  Payment Gateways & Webhook Health
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
                   Monitor live transaction flow, gateway statuses, and webhook
@@ -1120,14 +1132,14 @@ export default function AdminPage() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
-                  🟢 {gatewayHealth.status} (Webhooks Active)
+                  {gatewayHealth.status} (Webhooks Active)
                 </span>
                 <button
                   onClick={handleTestWebhook}
                   disabled={testingWebhook}
                   className="bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold px-4 py-1.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {testingWebhook ? "Testing..." : "⚡ Test Webhook Ping"}
+                  {testingWebhook ? "Testing..." : "Test Webhook Ping"}
                 </button>
               </div>
             </div>
@@ -1165,7 +1177,7 @@ export default function AdminPage() {
         {stats && (
           <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-4">
             <h3 className="text-lg font-bold text-gray-200">
-              📊 Subscription Distribution Analytics
+              Subscription Distribution Analytics
             </h3>
             <div className="flex items-center justify-between text-sm text-gray-400">
               <span>
@@ -1194,7 +1206,7 @@ export default function AdminPage() {
         <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-6">
           <div>
             <h2 className="text-xl font-bold text-gray-200">
-              📢 Broadcast Announcements
+              Broadcast Announcements
             </h2>
             <p className="text-gray-400 text-sm mt-1">
               Send push notifications or updates to your app users.
@@ -1209,7 +1221,7 @@ export default function AdminPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Maslan: New Pro Features Available! 🚀"
+                  placeholder="For example: New Pro features are available."
                   value={broadcastTitle}
                   onChange={(e) => setBroadcastTitle(e.target.value)}
                   className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
@@ -1251,7 +1263,7 @@ export default function AdminPage() {
             >
               {sendingBroadcast
                 ? "Sending Broadcast..."
-                : "🚀 Send Broadcast Now"}
+                : "Send Broadcast Now"}
             </button>
           </form>
         </div>
@@ -1260,7 +1272,7 @@ export default function AdminPage() {
         <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
           <div className="p-6 border-b border-gray-800">
             <h2 className="text-xl font-bold text-gray-200">
-              🛡️ Admin Audit & Activity Logs ({logs.length})
+              Admin Audit & Activity Logs ({logs.length})
             </h2>
             <p className="text-gray-400 text-sm mt-1">
               Track administrative actions and security updates.
@@ -1313,7 +1325,7 @@ export default function AdminPage() {
         <div className="bg-gray-900/80 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
           <div className="p-6 border-b border-gray-800">
             <h2 className="text-xl font-bold text-gray-200">
-              ⭐ User Reviews & Feedback Moderation ({reviews.length})
+              User Reviews & Feedback Moderation ({reviews.length})
             </h2>
           </div>
           <div className="overflow-x-auto">
@@ -1340,7 +1352,7 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="p-4 text-amber-400 font-bold">
-                        {"★".repeat(rev.rating)}
+                        Rating: {rev.rating}/5
                         {"☆".repeat(5 - rev.rating)} ({rev.rating}/5)
                       </td>
                       <td className="p-4 text-gray-300">{rev.comment}</td>
@@ -1475,7 +1487,7 @@ export default function AdminPage() {
           <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl relative">
             <div className="flex justify-between items-center border-b border-gray-800 pb-3">
               <h3 className="text-lg font-bold text-emerald-400">
-                ⚙️ Configure {selectedService || "Service"}
+                Configure {selectedService || "Service"}
               </h3>
               <button
                 onClick={() => setIsConfigModalOpen(false)}

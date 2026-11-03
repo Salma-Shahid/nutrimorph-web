@@ -50,7 +50,7 @@ export default function TermsOfService() {
           {/* Medical Disclaimer Banner */}
           <div className="bg-amber-950/40 border border-amber-500/50 p-6 rounded-xl">
             <h2 className="text-lg font-bold text-amber-400 mb-2">
-              ⚠️ Medical & Fitness Disclaimer
+              Medical & Fitness Disclaimer
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
               NutriMorph is an AI-assisted meal tracking and coaching tool.

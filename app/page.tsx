@@ -111,23 +111,45 @@ export default function Home() {
     }
   }, [isLoggedIn]);
 
-  // 🌟 Payment Success Handle karne ke liye naya useEffect
+  // Show confirmation after returning from checkout.
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const paymentStatus = queryParams.get("payment");
 
-    if (paymentStatus === "success") {
-      alert("🎉 Payment Successful! Your Pro Plan is now active.");
+    if (paymentStatus !== "success") return;
 
-      // LocalStorage update karein
-      localStorage.setItem("userPlan", "pro");
+    const verifySubscription = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) throw new Error("Please sign in to verify your subscription.");
+        const apiEndpoint =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
+        const response = await fetch(`${apiEndpoint}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || "Could not verify the subscription.");
+        }
+        const profile = result?.user || result;
+        if (profile.subscriptionTier !== "pro" && profile.isPro !== true) {
+          throw new Error("The subscription is not active yet. Please try again.");
+        }
+        setCurrentPlan("pro");
+        localStorage.setItem("userPlan", "pro");
+        alert("Payment successful. Your Pro plan is active.");
+      } catch (error) {
+        console.error("Could not verify the subscription after checkout:", error);
+        alert(
+          "Payment completed, but the subscription status could not be verified. Please refresh or contact support.",
+        );
+      } finally {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
 
-      // URL se query parameters saaf kar dein
-      window.history.replaceState({}, document.title, window.location.pathname);
-
-      // Page reload karein taake backend se fresh Pro status load ho jaye
-      window.location.reload();
-    }
+    verifySubscription();
   }, []);
 
   const handleLogout = () => {
@@ -427,7 +449,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* 👉 Logout Button Added Here */}
+                {/* Logout action */}
                 <button
                   onClick={handleLogout}
                   className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2.5 py-1 rounded-xl transition flex items-center space-x-1 text-xs font-semibold"
@@ -1077,6 +1099,14 @@ export default function Home() {
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>
+              <div className="text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-emerald-400 hover:text-emerald-300"
+                >
+                  Forgot password?
+                </Link>
+              </div>
 
               {loginErrorMessage && (
                 <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
@@ -1105,6 +1135,20 @@ export default function Home() {
             <Link href="/contact" className="hover:text-emerald-400 transition">
               Support / Contact
             </Link>
+            <a
+              href="mailto:support@nutrimorph.app"
+              className="hover:text-emerald-400 transition"
+            >
+              Email support
+            </a>
+            <a
+              href="https://nutrimorph.app"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-emerald-400 transition"
+            >
+              Official website
+            </a>
             <Link
               href="/privacy-policy"
               className="hover:text-emerald-400 transition"
