@@ -93,7 +93,7 @@ const EMPTY_API_USAGE: ApiUsageData = {
 const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
   Resend: ["RESEND_API_KEY", "RESEND_FROM_EMAIL", "RESEND_MONTHLY_LIMIT"],
   "MongoDB Atlas": [
-    "MONGODB_ATLAS_GROUP_ID",
+    "MONGODB_ATLAS_GROUP_ID or MONGODB_ATLAS_PROJECT_ID",
     "MONGODB_ATLAS_PUBLIC_KEY",
     "MONGODB_ATLAS_PRIVATE_KEY",
     "MONGODB_ATLAS_CLUSTER_NAME",
@@ -105,7 +105,7 @@ const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
   ],
   "Expo EAS": [
     "EXPO_ACCESS_TOKEN",
-    "EXPO_PROJECT_ID",
+    "EXPO_PROJECT_ID (EAS project UUID)",
     "EXPO_MONTHLY_BUILD_LIMIT",
   ],
   Cloudinary: [
