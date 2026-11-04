@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { API_BASE_URL } from "@/lib/api";
 import {
   Camera,
   Bot,
@@ -73,10 +74,7 @@ export default function Home() {
       if (!token) return;
 
       try {
-        const apiEndpoint =
-          process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
-
-        const res = await fetch(`${apiEndpoint}/api/auth/profile`, {
+        const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -122,9 +120,7 @@ export default function Home() {
       try {
         const token = localStorage.getItem("token");
         if (!token) throw new Error("Please sign in to verify your subscription.");
-        const apiEndpoint =
-          process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
-        const response = await fetch(`${apiEndpoint}/api/auth/me`, {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
@@ -168,10 +164,7 @@ export default function Home() {
     setLoginErrorMessage("");
 
     try {
-      const apiEndpoint =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
-
-      const res = await fetch(`${apiEndpoint}/api/auth/login`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -241,10 +234,7 @@ export default function Home() {
     if (planName === "Free Plan") {
       try {
         setLoading(true);
-        const apiEndpoint =
-          process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
-
-        const response = await fetch(`${apiEndpoint}/api/payment/update-plan`, {
+        const response = await fetch(`${API_BASE_URL}/api/payment/update-plan`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -282,11 +272,8 @@ export default function Home() {
     payload: CheckoutPayload,
     token: string | null,
   ): Promise<CheckoutResponse> => {
-    const apiEndpoint =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
-
     const res = await fetch(
-      `${apiEndpoint}/api/payment/create-checkout-session`,
+      `${API_BASE_URL}/api/payment/create-checkout-session`,
       {
         method: "POST",
         headers: {

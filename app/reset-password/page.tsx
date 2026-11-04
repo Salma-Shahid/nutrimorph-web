@@ -3,9 +3,7 @@
 import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
+import { API_BASE_URL } from "@/lib/api";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();

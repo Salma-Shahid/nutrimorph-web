@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "@/lib/api";
 
 interface StatsData {
   totalUsers: number;
@@ -117,9 +118,6 @@ export default function AdminPage() {
   const [newApiKey, setNewApiKey] = useState<string>("");
   const [flippedCard, setFlippedCard] = useState<string | null>(null);
 
-  const API_BASE_URL =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
-
   const fetchAdminData = useCallback(async () => {
     try {
       setError("");
@@ -137,7 +135,7 @@ export default function AdminPage() {
         },
       };
 
-      const profileRes = await axios.get(`${API_BASE_URL}/auth/me`, config);
+      const profileRes = await axios.get(`${API_BASE_URL}/api/auth/me`, config);
       const profile = profileRes.data?.user || profileRes.data;
       if (profile?.role !== "admin") {
         window.location.replace("/");
@@ -146,19 +144,19 @@ export default function AdminPage() {
 
       const [statsRes, usersRes, reviewsRes, logsRes, usageRes, gatewayRes] =
         await Promise.all([
-          axios.get(`${API_BASE_URL}/admin/stats`, config),
-          axios.get(`${API_BASE_URL}/admin/users`, config),
+          axios.get(`${API_BASE_URL}/api/admin/stats`, config),
+          axios.get(`${API_BASE_URL}/api/admin/users`, config),
           axios
-            .get(`${API_BASE_URL}/admin/reviews`, config)
+            .get(`${API_BASE_URL}/api/admin/reviews`, config)
             .catch(() => ({ data: { data: [] } })),
           axios
-            .get(`${API_BASE_URL}/admin/logs`, config)
+            .get(`${API_BASE_URL}/api/admin/logs`, config)
             .catch(() => ({ data: { data: [] } })),
           axios
-            .get(`${API_BASE_URL}/admin/api-usage`, config)
+            .get(`${API_BASE_URL}/api/admin/api-usage`, config)
             .catch(() => ({ data: { data: apiUsage } })),
           axios
-            .get(`${API_BASE_URL}/admin/gateway-health`, config)
+            .get(`${API_BASE_URL}/api/admin/gateway-health`, config)
             .catch(() => ({
               data: {
                 data: {
@@ -181,7 +179,7 @@ export default function AdminPage() {
 
       try {
         const revenueRes = await axios.get(
-          `${API_BASE_URL}/admin/revenue`,
+          `${API_BASE_URL}/api/admin/revenue`,
           config,
         );
         setRevenue(revenueRes.data.data);
@@ -213,7 +211,7 @@ export default function AdminPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [API_BASE_URL, apiUsage]);
+  }, [apiUsage]);
 
   useEffect(() => {
     let isMounted = true;
@@ -255,7 +253,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       await axios.patch(
-        `${API_BASE_URL}/admin/users/${userId}/tier`,
+        `${API_BASE_URL}/api/admin/users/${userId}/tier`,
         { subscriptionTier: newTier },
         config,
       );
@@ -274,7 +272,7 @@ export default function AdminPage() {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      await axios.delete(`${API_BASE_URL}/admin/users/${userId}`, config);
+      await axios.delete(`${API_BASE_URL}/api/admin/users/${userId}`, config);
       fetchAdminData();
     } catch (err: unknown) {
       const errorMsg =
@@ -290,7 +288,7 @@ export default function AdminPage() {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      await axios.delete(`${API_BASE_URL}/admin/reviews/${reviewId}`, config);
+      await axios.delete(`${API_BASE_URL}/api/admin/reviews/${reviewId}`, config);
       fetchAdminData();
     } catch (err: unknown) {
       const errorMsg =
@@ -320,7 +318,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const res = await axios.post(
-        `${API_BASE_URL}/admin/broadcast`,
+        `${API_BASE_URL}/api/admin/broadcast`,
         { title: broadcastTitle, message: broadcastMessage, targetAudience },
         config,
       );
@@ -348,7 +346,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const res = await axios.post(
-        `${API_BASE_URL}/admin/test-email`,
+        `${API_BASE_URL}/api/admin/test-email`,
         {},
         config,
       );
@@ -379,7 +377,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const res = await axios.post(
-        `${API_BASE_URL}/admin/cleanup-db`,
+        `${API_BASE_URL}/api/admin/cleanup-db`,
         {},
         config,
       );
@@ -406,7 +404,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const res = await axios.post(
-        `${API_BASE_URL}/admin/sync-services`,
+        `${API_BASE_URL}/api/admin/sync-services`,
         {},
         config,
       );
@@ -439,7 +437,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const res = await axios.post(
-        `${API_BASE_URL}/admin/purge-cloudinary`,
+        `${API_BASE_URL}/api/admin/purge-cloudinary`,
         {},
         config,
       );
@@ -465,7 +463,7 @@ export default function AdminPage() {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      const res = await axios.get(`${API_BASE_URL}/admin/expo-builds`, config);
+      const res = await axios.get(`${API_BASE_URL}/api/admin/expo-builds`, config);
       alert(
         "Expo EAS status: " +
           (res.data.message || "Build queues checked successfully!"),
@@ -488,7 +486,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const res = await axios.post(
-        `${API_BASE_URL}/admin/test-webhook`,
+        `${API_BASE_URL}/api/admin/test-webhook`,
         {},
         config,
       );
@@ -518,7 +516,7 @@ export default function AdminPage() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       await axios.patch(
-        `${API_BASE_URL}/admin/update-config`,
+        `${API_BASE_URL}/api/admin/update-config`,
         { service: selectedService, apiKey: newApiKey },
         config,
       );

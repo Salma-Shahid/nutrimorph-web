@@ -2,9 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.nutrimorph.app";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
