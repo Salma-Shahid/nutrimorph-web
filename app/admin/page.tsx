@@ -47,25 +47,74 @@ interface ActivityLogData {
 interface GatewayHealthData {
   gatewayName: string;
   status: string;
-  activeWebhooks: number;
-  failedWebhooksLast24h: number;
-  totalTransactionVolumeUSD: number;
+  activeWebhooks: number | null;
+  failedWebhooksLast24h: number | null;
+  totalTransactionVolumeUSD: number | null;
+  message?: string;
+}
+
+interface IntegrationStatus {
+  connected: boolean;
+  message?: string;
 }
 
 interface ApiUsageData {
-  sendgridEmailsUsed: number;
-  sendgridLimit: number;
-  dbStorageUsedMB: number;
-  dbLimitMB: number;
-  geminiApiCalls: number;
-  geminiLimit: number;
-  cloudinaryStorageGB: number;
-  cloudinaryLimitGB: number;
-  expoBuildsUsed: number;
-  expoBuildsLimit: number;
-  expoOtaBandwidthMB: number;
-  expoOtaLimitMB: number;
+  sendgridEmailsUsed: number | null;
+  sendgridLimit: number | null;
+  dbStorageUsedMB: number | null;
+  dbLimitMB: number | null;
+  geminiApiCalls: number | null;
+  geminiLimit: number | null;
+  cloudinaryStorageGB: number | null;
+  cloudinaryLimitGB: number | null;
+  expoBuildsUsed: number | null;
+  expoBuildsLimit: number | null;
+  expoOtaBandwidthMB: number | null;
+  expoOtaLimitMB: number | null;
+  services?: Record<string, IntegrationStatus>;
 }
+
+const EMPTY_API_USAGE: ApiUsageData = {
+  sendgridEmailsUsed: null,
+  sendgridLimit: null,
+  dbStorageUsedMB: null,
+  dbLimitMB: null,
+  geminiApiCalls: null,
+  geminiLimit: null,
+  cloudinaryStorageGB: null,
+  cloudinaryLimitGB: null,
+  expoBuildsUsed: null,
+  expoBuildsLimit: null,
+  expoOtaBandwidthMB: null,
+  expoOtaLimitMB: null,
+  services: {},
+};
+
+const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
+  SendGrid: ["SENDGRID_API_KEY", "SENDGRID_MONTHLY_LIMIT"],
+  "MongoDB Atlas": [
+    "MONGODB_ATLAS_GROUP_ID",
+    "MONGODB_ATLAS_PUBLIC_KEY",
+    "MONGODB_ATLAS_PRIVATE_KEY",
+    "MONGODB_ATLAS_CLUSTER_NAME",
+  ],
+  "Gemini AI": [
+    "GOOGLE_CLOUD_PROJECT_ID",
+    "GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS",
+    "GEMINI_MONTHLY_CALL_LIMIT",
+  ],
+  "Expo EAS": [
+    "EXPO_ACCESS_TOKEN",
+    "EXPO_PROJECT_ID",
+    "EXPO_MONTHLY_BUILD_LIMIT",
+  ],
+  Cloudinary: [
+    "CLOUDINARY_CLOUD_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+  ],
+  "Stripe & Billing": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+};
 
 export default function AdminPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -74,20 +123,8 @@ export default function AdminPage() {
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [logs, setLogs] = useState<ActivityLogData[]>([]);
 
-  const [apiUsage, setApiUsage] = useState<ApiUsageData>({
-    sendgridEmailsUsed: 120,
-    sendgridLimit: 3000,
-    dbStorageUsedMB: 45.5,
-    dbLimitMB: 512,
-    geminiApiCalls: 430,
-    geminiLimit: 10000,
-    cloudinaryStorageGB: 1.2,
-    cloudinaryLimitGB: 25,
-    expoBuildsUsed: 18,
-    expoBuildsLimit: 30,
-    expoOtaBandwidthMB: 350,
-    expoOtaLimitMB: 1000,
-  });
+  const [apiUsage, setApiUsage] = useState<ApiUsageData>(EMPTY_API_USAGE);
+  const [revenueStatus, setRevenueStatus] = useState("");
 
   const [testingEmail, setTestingEmail] = useState<boolean>(false);
   const [cleaningDb, setCleaningDb] = useState<boolean>(false);
@@ -115,7 +152,6 @@ export default function AdminPage() {
   // Modal & Card Flip States
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [selectedService, setSelectedService] = useState<string>("");
-  const [newApiKey, setNewApiKey] = useState<string>("");
   const [flippedCard, setFlippedCard] = useState<string | null>(null);
 
   const fetchAdminData = useCallback(async () => {
@@ -154,20 +190,8 @@ export default function AdminPage() {
             .catch(() => ({ data: { data: [] } })),
           axios
             .get(`${API_BASE_URL}/api/admin/api-usage`, config)
-            .catch(() => ({ data: { data: apiUsage } })),
-          axios
-            .get(`${API_BASE_URL}/api/admin/gateway-health`, config)
-            .catch(() => ({
-              data: {
-                data: {
-                  gatewayName: "Stripe",
-                  status: "Healthy",
-                  activeWebhooks: 4,
-                  failedWebhooksLast24h: 0,
-                  totalTransactionVolumeUSD: 9.99,
-                },
-              },
-            })),
+            .catch(() => ({ data: { data: EMPTY_API_USAGE } })),
+          axios.get(`${API_BASE_URL}/api/admin/gateway-health`, config),
         ]);
 
       setStats(statsRes.data.data);
@@ -183,13 +207,13 @@ export default function AdminPage() {
           config,
         );
         setRevenue(revenueRes.data.data);
-      } catch {
-        const proCount = statsRes.data.data?.proUsers || 0;
-        setRevenue({
-          totalRevenue: proCount * 9.99,
-          activeSubscriptions: proCount,
-          currency: "USD",
-        });
+        setRevenueStatus("");
+      } catch (revenueError: unknown) {
+        setRevenue(null);
+        setRevenueStatus(
+          (revenueError as { response?: { data?: { message?: string } } })
+            ?.response?.data?.message || "Live Stripe revenue is unavailable.",
+        );
       }
     } catch (err: unknown) {
       const status = (
@@ -211,19 +235,19 @@ export default function AdminPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [apiUsage]);
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    const loadData = async () => {
+    const loadData = () => {
       setLoading(true);
-      await fetchAdminData();
+      void fetchAdminData();
     };
-    if (isMounted) {
-      loadData();
-    }
+    loadData();
+    const intervalId = window.setInterval(() => {
+      void fetchAdminData();
+    }, 60000);
     return () => {
-      isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, [fetchAdminData]);
 
@@ -504,32 +528,33 @@ export default function AdminPage() {
   };
 
   // Helper for High Usage Limit Warnings
-  const checkHighUsage = (used: number, limit: number) => {
+  const checkHighUsage = (used: number | null, limit: number | null) => {
+    if (used == null || limit == null || limit <= 0) return false;
     const percentage = (used / limit) * 100;
     return percentage >= 80;
   };
-
-  const handleUpdateConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem("token");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-
-      await axios.patch(
-        `${API_BASE_URL}/api/admin/update-config`,
-        { service: selectedService, apiKey: newApiKey },
-        config,
-      );
-      alert(`Configuration for ${selectedService} updated successfully!`);
-      setIsConfigModalOpen(false);
-      setNewApiKey("");
-      fetchAdminData();
-    } catch {
-      alert(`Credentials for ${selectedService} updated successfully.`);
-      setIsConfigModalOpen(false);
-      setNewApiKey("");
-    }
+  const formatUsage = (
+    used: number | null,
+    limit: number | null,
+    unit = "",
+  ) => {
+    if (used == null) return "Not connected";
+    const formattedUsed = Number.isInteger(used) ? String(used) : used.toFixed(2);
+    if (limit == null) return `${formattedUsed}${unit} used`;
+    const formattedLimit = Number.isInteger(limit)
+      ? String(limit)
+      : limit.toFixed(2);
+    return `${formattedUsed}/${formattedLimit}${unit}`;
   };
+  const usagePercent = (used: number | null, limit: number | null) =>
+    used == null || limit == null || limit <= 0
+      ? 0
+      : Math.min(100, (used / limit) * 100);
+  const integrationsConnected =
+    Object.values(apiUsage.services || {}).length > 0 &&
+    Object.values(apiUsage.services || {}).every(
+      (service) => service.connected,
+    );
 
   if (loading) {
     return (
@@ -616,7 +641,7 @@ export default function AdminPage() {
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between hover:border-emerald-500/40 transition">
               <div>
                 <p className="text-gray-400 text-sm font-medium">
-                  Total Estimated Revenue
+                  Stripe Transaction Volume (30 days)
                 </p>
                 <p className="text-3xl font-extrabold text-emerald-400 mt-2">
                   ${revenue.totalRevenue.toFixed(2)}{" "}
@@ -645,6 +670,9 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+        {!revenue && revenueStatus && (
+          <p className="text-sm text-amber-300">{revenueStatus}</p>
+        )}
 
         {/* API & Service Usage Monitor Widget */}
         <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-6">
@@ -654,12 +682,20 @@ export default function AdminPage() {
                 API & Service Usage Monitor
               </h2>
               <p className="text-gray-400 text-sm mt-1">
-                Track third-party integration limits, billing, and system health
-                in real-time. (Click any card to flip & configure)
+                Live metrics from configured provider APIs; missing credentials
+                are shown as unavailable.
               </p>
             </div>
-            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
-              All Systems Healthy
+            <span
+              className={`px-3 py-1 text-xs font-bold rounded-full border ${
+                integrationsConnected
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  : "bg-amber-500/10 text-amber-300 border-amber-500/20"
+              }`}
+            >
+              {integrationsConnected
+                ? "Configured services connected"
+                : "Some integrations unavailable"}
             </span>
           </div>
 
@@ -755,7 +791,7 @@ export default function AdminPage() {
                 className="bg-gray-950 hover:bg-gray-800 border border-amber-500/40 text-amber-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 hover:scale-[1.02]"
               >
                 <div className="text-sm font-bold flex items-center gap-2">
-                  Config Keys
+                  Server Setup
                 </div>
                 <div className="text-gray-500 text-[11px]">
                   Manage API & Billing
@@ -795,7 +831,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
                   >
-                    Update API Key
+                    View Server Setup
                   </button>
                 </div>
               ) : (
@@ -805,7 +841,10 @@ export default function AdminPage() {
                       SendGrid
                     </span>
                     <span className="text-emerald-400 font-bold">
-                      {apiUsage.sendgridEmailsUsed}/{apiUsage.sendgridLimit}
+                      {formatUsage(
+                        apiUsage.sendgridEmailsUsed,
+                        apiUsage.sendgridLimit,
+                      )}
                     </span>
                   </div>
                   {checkHighUsage(
@@ -820,17 +859,16 @@ export default function AdminPage() {
                     <div
                       className="bg-emerald-500 h-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(
-                          100,
-                          (apiUsage.sendgridEmailsUsed /
-                            apiUsage.sendgridLimit) *
-                            100,
+                        width: `${usagePercent(
+                          apiUsage.sendgridEmailsUsed,
+                          apiUsage.sendgridLimit,
                         )}%`,
                       }}
                     ></div>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Click to configure or upgrade.
+                    {apiUsage.services?.sendgrid?.message ||
+                      "SendGrid usage requires a server API key."}
                   </p>
                 </>
               )}
@@ -863,7 +901,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
                   >
-                    Update Connection URI
+                    View Server Setup
                   </button>
                 </div>
               ) : (
@@ -873,7 +911,11 @@ export default function AdminPage() {
                       MongoDB
                     </span>
                     <span className="text-sky-400 font-bold">
-                      {apiUsage.dbStorageUsedMB}/{apiUsage.dbLimitMB}MB
+                      {formatUsage(
+                        apiUsage.dbStorageUsedMB,
+                        apiUsage.dbLimitMB,
+                        " MB",
+                      )}
                     </span>
                   </div>
                   {checkHighUsage(
@@ -888,15 +930,16 @@ export default function AdminPage() {
                     <div
                       className="bg-sky-500 h-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(
-                          100,
-                          (apiUsage.dbStorageUsedMB / apiUsage.dbLimitMB) * 100,
+                        width: `${usagePercent(
+                          apiUsage.dbStorageUsedMB,
+                          apiUsage.dbLimitMB,
                         )}%`,
                       }}
                     ></div>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Click to configure or upgrade.
+                    {apiUsage.services?.atlas?.message ||
+                      "MongoDB Atlas monitoring credentials are required."}
                   </p>
                 </>
               )}
@@ -931,7 +974,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
                   >
-                    Update Gemini Key
+                    View Server Setup
                   </button>
                 </div>
               ) : (
@@ -941,7 +984,11 @@ export default function AdminPage() {
                       Gemini AI
                     </span>
                     <span className="text-amber-400 font-bold">
-                      {apiUsage.geminiApiCalls}/{apiUsage.geminiLimit}
+                      {formatUsage(
+                        apiUsage.geminiApiCalls,
+                        apiUsage.geminiLimit,
+                        " calls",
+                      )}
                     </span>
                   </div>
                   {checkHighUsage(
@@ -956,16 +1003,16 @@ export default function AdminPage() {
                     <div
                       className="bg-amber-500 h-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(
-                          100,
-                          (apiUsage.geminiApiCalls / apiUsage.geminiLimit) *
-                            100,
+                        width: `${usagePercent(
+                          apiUsage.geminiApiCalls,
+                          apiUsage.geminiLimit,
                         )}%`,
                       }}
                     ></div>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Click to configure or upgrade.
+                    {apiUsage.services?.gemini?.message ||
+                      "Gemini usage is tracked from NutriMorph API calls."}
                   </p>
                 </>
               )}
@@ -1000,7 +1047,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
                   >
-                    Update Expo Token
+                    View Server Setup
                   </button>
                 </div>
               ) : (
@@ -1010,7 +1057,11 @@ export default function AdminPage() {
                       Expo Builds
                     </span>
                     <span className="text-purple-400 font-bold">
-                      {apiUsage.expoBuildsUsed}/{apiUsage.expoBuildsLimit}
+                      {formatUsage(
+                        apiUsage.expoBuildsUsed,
+                        apiUsage.expoBuildsLimit,
+                        " builds",
+                      )}
                     </span>
                   </div>
                   {checkHighUsage(
@@ -1025,16 +1076,16 @@ export default function AdminPage() {
                     <div
                       className="bg-purple-500 h-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(
-                          100,
-                          (apiUsage.expoBuildsUsed / apiUsage.expoBuildsLimit) *
-                            100,
+                        width: `${usagePercent(
+                          apiUsage.expoBuildsUsed,
+                          apiUsage.expoBuildsLimit,
                         )}%`,
                       }}
                     ></div>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Click to configure or upgrade.
+                    {apiUsage.services?.expo?.message ||
+                      "Expo EAS access requires a server token and project ID."}
                   </p>
                 </>
               )}
@@ -1071,7 +1122,7 @@ export default function AdminPage() {
                     }}
                     className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
                   >
-                    Update Cloud Credentials
+                    View Server Setup
                   </button>
                 </div>
               ) : (
@@ -1081,8 +1132,11 @@ export default function AdminPage() {
                       Cloudinary
                     </span>
                     <span className="text-cyan-400 font-bold">
-                      {apiUsage.cloudinaryStorageGB}/
-                      {apiUsage.cloudinaryLimitGB} GB
+                      {formatUsage(
+                        apiUsage.cloudinaryStorageGB,
+                        apiUsage.cloudinaryLimitGB,
+                        " GB",
+                      )}
                     </span>
                   </div>
                   {checkHighUsage(
@@ -1097,17 +1151,16 @@ export default function AdminPage() {
                     <div
                       className="bg-cyan-500 h-full transition-all duration-500"
                       style={{
-                        width: `${Math.min(
-                          100,
-                          (apiUsage.cloudinaryStorageGB /
-                            apiUsage.cloudinaryLimitGB) *
-                            100,
+                        width: `${usagePercent(
+                          apiUsage.cloudinaryStorageGB,
+                          apiUsage.cloudinaryLimitGB,
                         )}%`,
                       }}
                     ></div>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Click to configure or upgrade.
+                    {apiUsage.services?.cloudinary?.message ||
+                      "Cloudinary Admin API credentials are required."}
                   </p>
                 </>
               )}
@@ -1129,8 +1182,8 @@ export default function AdminPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20">
-                  {gatewayHealth.status} (Webhooks Active)
+                <span className="px-3 py-1 bg-slate-800 text-slate-300 text-xs font-bold rounded-full border border-slate-700">
+                  {gatewayHealth.status}
                 </span>
                 <button
                   onClick={handleTestWebhook}
@@ -1156,15 +1209,19 @@ export default function AdminPage() {
                   Active Webhooks
                 </p>
                 <p className="text-lg font-bold text-sky-400">
-                  {gatewayHealth.activeWebhooks} Endpoints
+                  {gatewayHealth.activeWebhooks == null
+                    ? "Unavailable"
+                    : `${gatewayHealth.activeWebhooks} endpoints`}
                 </p>
               </div>
               <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
                 <p className="text-gray-400 text-xs font-medium">
-                  Failed Webhooks (24h)
+                  Pending Delivery Events (30 days)
                 </p>
                 <p className="text-lg font-bold text-amber-400">
-                  {gatewayHealth.failedWebhooksLast24h} Errors
+                  {gatewayHealth.failedWebhooksLast24h == null
+                    ? "Unavailable"
+                    : `${gatewayHealth.failedWebhooksLast24h} events`}
                 </p>
               </div>
             </div>
@@ -1485,7 +1542,7 @@ export default function AdminPage() {
           <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl relative">
             <div className="flex justify-between items-center border-b border-gray-800 pb-3">
               <h3 className="text-lg font-bold text-emerald-400">
-                Configure {selectedService || "Service"}
+                Server setup for {selectedService || "Service"}
               </h3>
               <button
                 onClick={() => setIsConfigModalOpen(false)}
@@ -1495,61 +1552,24 @@ export default function AdminPage() {
               </button>
             </div>
 
-            <form onSubmit={handleUpdateConfig} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">
-                  Target Integration Service
-                </label>
-                <select
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="SendGrid">SendGrid (Email API)</option>
-                  <option value="MongoDB Atlas">MongoDB Atlas (DB URI)</option>
-                  <option value="Gemini AI">Gemini AI (Tokens Key)</option>
-                  <option value="Expo EAS">
-                    Expo EAS (Mobile Build Token)
-                  </option>
-                  <option value="Cloudinary">
-                    Cloudinary (Media Cloud Key)
-                  </option>
-                  <option value="Stripe & Billing">
-                    Stripe (Secret & Webhook Key)
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">
-                  New API Key / Token / Link Secret
-                </label>
-                <input
-                  type="password"
-                  placeholder="Paste secret key or config token..."
-                  value={newApiKey}
-                  onChange={(e) => setNewApiKey(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 text-gray-200 px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
-                  required
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsConfigModalOpen(false)}
-                  className="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold rounded-xl text-xs shadow-lg shadow-emerald-600/20"
-                >
-                  Save Credentials
-                </button>
-              </div>
-            </form>
+            <p className="text-sm text-gray-300">
+              Provider credentials must be stored in the backend environment.
+              They are never collected or sent from this browser.
+            </p>
+            <ul className="space-y-1">
+              {(SERVER_ENVIRONMENT_KEYS[selectedService] || []).map((key) => (
+                <li key={key} className="font-mono text-xs text-emerald-300">
+                  {key}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setIsConfigModalOpen(false)}
+              className="w-full px-4 py-2 bg-gray-800 text-gray-300 rounded-xl text-xs font-semibold"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

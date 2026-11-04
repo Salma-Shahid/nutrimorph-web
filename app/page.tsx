@@ -107,6 +107,19 @@ export default function Home() {
     if (isLoggedIn) {
       fetchUserProfile();
     }
+    const refreshVisibleProfile = () => {
+      if (document.visibilityState === "visible" && isLoggedIn) {
+        fetchUserProfile();
+      }
+    };
+    const refreshInterval = window.setInterval(() => {
+      if (isLoggedIn) fetchUserProfile();
+    }, 15000);
+    document.addEventListener("visibilitychange", refreshVisibleProfile);
+    return () => {
+      window.clearInterval(refreshInterval);
+      document.removeEventListener("visibilitychange", refreshVisibleProfile);
+    };
   }, [isLoggedIn]);
 
   // Show confirmation after returning from checkout.
@@ -1123,7 +1136,7 @@ export default function Home() {
               Support / Contact
             </Link>
             <a
-              href="mailto:support@nutrimorph.app"
+              href="mailto:nutrimorphsupport@gmail.com"
               className="hover:text-emerald-400 transition"
             >
               Email support
