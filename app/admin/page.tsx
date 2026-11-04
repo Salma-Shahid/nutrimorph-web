@@ -59,8 +59,8 @@ interface IntegrationStatus {
 }
 
 interface ApiUsageData {
-  sendgridEmailsUsed: number | null;
-  sendgridLimit: number | null;
+  resendEmailsSent: number | null;
+  resendMonthlyLimit: number | null;
   dbStorageUsedMB: number | null;
   dbLimitMB: number | null;
   geminiApiCalls: number | null;
@@ -75,8 +75,8 @@ interface ApiUsageData {
 }
 
 const EMPTY_API_USAGE: ApiUsageData = {
-  sendgridEmailsUsed: null,
-  sendgridLimit: null,
+  resendEmailsSent: null,
+  resendMonthlyLimit: null,
   dbStorageUsedMB: null,
   dbLimitMB: null,
   geminiApiCalls: null,
@@ -91,7 +91,7 @@ const EMPTY_API_USAGE: ApiUsageData = {
 };
 
 const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
-  SendGrid: ["SENDGRID_API_KEY", "SENDGRID_MONTHLY_LIMIT"],
+  Resend: ["RESEND_API_KEY", "RESEND_FROM_EMAIL", "RESEND_MONTHLY_LIMIT"],
   "MongoDB Atlas": [
     "MONGODB_ATLAS_GROUP_ID",
     "MONGODB_ATLAS_PUBLIC_KEY",
@@ -726,7 +726,7 @@ export default function AdminPage() {
                   {testingEmail ? "Sending..." : "Test Email"}
                 </div>
                 <div className="text-gray-500 text-[11px]">
-                  Dispatch ping to SMTP
+                  Send a Resend test email
                 </div>
               </button>
 
@@ -802,22 +802,22 @@ export default function AdminPage() {
 
           {/* FLIPPABLE SERVICE CARDS WITH AUTOMATED ALERTS */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {/* SendGrid / Email API */}
+            {/* Resend Email API */}
             <div
               onClick={() =>
-                setFlippedCard(flippedCard === "sendgrid" ? null : "sendgrid")
+                setFlippedCard(flippedCard === "resend" ? null : "resend")
               }
               className="bg-gray-950 p-4 rounded-xl border border-gray-800 cursor-pointer transition-all duration-300 hover:border-emerald-500/50 space-y-2 relative"
             >
-              {flippedCard === "sendgrid" ? (
+              {flippedCard === "resend" ? (
                 <div className="space-y-2 animate-fadeIn">
                   <p className="text-xs font-bold text-emerald-400">
-                    SendGrid Actions
+                    Resend Actions
                   </p>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.open("https://app.sendgrid.com", "_blank");
+                      window.open("https://resend.com/overview", "_blank");
                     }}
                     className="w-full bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 py-1 rounded text-[11px] border border-emerald-500/30"
                   >
@@ -826,7 +826,7 @@ export default function AdminPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedService("SendGrid");
+                      setSelectedService("Resend");
                       setIsConfigModalOpen(true);
                     }}
                     className="w-full bg-gray-900 text-gray-300 py-1 rounded text-[11px]"
@@ -838,18 +838,18 @@ export default function AdminPage() {
                 <>
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-gray-300 flex items-center gap-1">
-                      SendGrid
+                      Resend
                     </span>
                     <span className="text-emerald-400 font-bold">
                       {formatUsage(
-                        apiUsage.sendgridEmailsUsed,
-                        apiUsage.sendgridLimit,
+                        apiUsage.resendEmailsSent,
+                        apiUsage.resendMonthlyLimit,
                       )}
                     </span>
                   </div>
                   {checkHighUsage(
-                    apiUsage.sendgridEmailsUsed,
-                    apiUsage.sendgridLimit,
+                    apiUsage.resendEmailsSent,
+                    apiUsage.resendMonthlyLimit,
                   ) && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-bold rounded border border-amber-500/40 animate-pulse block">
                       High Usage (&gt;80%)
@@ -860,15 +860,15 @@ export default function AdminPage() {
                       className="bg-emerald-500 h-full transition-all duration-500"
                       style={{
                         width: `${usagePercent(
-                          apiUsage.sendgridEmailsUsed,
-                          apiUsage.sendgridLimit,
+                          apiUsage.resendEmailsSent,
+                          apiUsage.resendMonthlyLimit,
                         )}%`,
                       }}
                     ></div>
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    {apiUsage.services?.sendgrid?.message ||
-                      "SendGrid usage requires a server API key."}
+                    {apiUsage.services?.resend?.message ||
+                      "Resend usage requires server-side configuration."}
                   </p>
                 </>
               )}
