@@ -132,29 +132,41 @@ export default function Home() {
     const verifySubscription = async () => {
       try {
         const token = localStorage.getItem("token");
-        if (!token) throw new Error("Please sign in to verify your subscription.");
+        if (!token)
+          throw new Error("Please sign in to verify your subscription.");
         const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
         const result = await response.json();
         if (!response.ok) {
-          throw new Error(result.message || "Could not verify the subscription.");
+          throw new Error(
+            result.message || "Could not verify the subscription.",
+          );
         }
         const profile = result?.user || result;
         if (profile.subscriptionTier !== "pro" && profile.isPro !== true) {
-          throw new Error("The subscription is not active yet. Please try again.");
+          throw new Error(
+            "The subscription is not active yet. Please try again.",
+          );
         }
         setCurrentPlan("pro");
         localStorage.setItem("userPlan", "pro");
         alert("Payment successful. Your Pro plan is active.");
       } catch (error) {
-        console.error("Could not verify the subscription after checkout:", error);
+        console.error(
+          "Could not verify the subscription after checkout:",
+          error,
+        );
         alert(
           "Payment completed, but the subscription status could not be verified. Please refresh or contact support.",
         );
       } finally {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname,
+        );
       }
     };
 
@@ -247,17 +259,20 @@ export default function Home() {
     if (planName === "Free Plan") {
       try {
         setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/api/payment/update-plan`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+        const response = await fetch(
+          `${API_BASE_URL}/api/payment/update-plan`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              plan: "Free",
+              aiModel: "gemini-3.5-flash-lite",
+            }),
           },
-          body: JSON.stringify({
-            plan: "Free",
-            aiModel: "gemini-3.5-flash-lite",
-          }),
-        });
+        );
 
         if (response.ok) {
           localStorage.setItem("userPlan", "Free");
@@ -354,7 +369,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
-      {/* Header / Navbar */}
       {/* Header / Navbar */}
       <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -784,9 +798,10 @@ export default function Home() {
             </button>
             {openFaq === 1 && (
               <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
-                NutriMorph uses advanced Gemini 3.5 Flash AI, which achieves
-                over 95% accuracy in detecting food ingredients and estimating
-                standard portion sizes and macros.
+                NutriMorph is AI food scanner is powered by advanced vision
+                models designed to detect food items, portion sizes, and
+                nutrient breakdowns with high precision, minimizing the need for
+                tedious manual logging.
               </div>
             )}
           </div>
@@ -818,16 +833,38 @@ export default function Home() {
               onClick={() => toggleFaq(3)}
               className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
             >
-              <span>Is NutriMorph available in multiple languages?</span>
+              <span>How does the step tracking and health sync work?</span>
               <ChevronDown
                 className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 3 ? "rotate-180 text-emerald-400" : ""}`}
               />
             </button>
             {openFaq === 3 && (
               <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
-                Yes, NutriMorph is built to support a global audience with
-                multilingual features (including English and Urdu) for seamless
-                meal logging and AI coaching.
+                NutriMorph seamlessly integrates with native device sensors and
+                health frameworks to monitor your daily steps and physical
+                activities accurately, factoring them directly into your daily
+                energy expenditure calculations.
+              </div>
+            )}
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleFaq(3)}
+              className="w-full px-6 py-5 text-left flex items-center justify-between text-white font-semibold transition hover:text-emerald-400"
+            >
+              <span>
+                Can I use NutriMorph without an active internet connection?
+              </span>
+              <ChevronDown
+                className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === 3 ? "rotate-180 text-emerald-400" : ""}`}
+              />
+            </button>
+            {openFaq === 3 && (
+              <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
+                Yes, NutriMorph can be used offline for basic features like
+                manual food logging and step tracking. However, AI food image
+                scanning and NutriBot chat require an active internet connection
+                to function properly.
               </div>
             )}
           </div>
@@ -844,9 +881,11 @@ export default function Home() {
             </button>
             {openFaq === 4 && (
               <div className="px-6 pb-5 text-sm text-slate-400 leading-relaxed border-t border-slate-800/50 pt-3">
-                The Free plan provides basic meal logging and calorie tracking.
-                The Pro plan unlocks unlimited AI food photo scans, deep macro
-                breakdowns, and 24/7 personal guidance from NutriBot AI Coach.
+                Free Plan: Includes standard daily calorie tracking, basic
+                manual food logging, and a limited number of daily AI photo
+                recognition scans. <br /> Pro Plan: Unlocks unlimited AI food
+                photo analysis, advanced macro breakdowns, custom AI dietician
+                coaching, and priority cloud data synchronization.
               </div>
             )}
           </div>
