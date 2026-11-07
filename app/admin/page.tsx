@@ -216,9 +216,8 @@ export default function AdminPage() {
         );
       }
     } catch (err: unknown) {
-      const status = (
-        err as { response?: { status?: number } }
-      )?.response?.status;
+      const status = (err as { response?: { status?: number } })?.response
+        ?.status;
       if (status === 401 || status === 403) {
         window.location.replace("/");
         return;
@@ -312,7 +311,10 @@ export default function AdminPage() {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      await axios.delete(`${API_BASE_URL}/api/admin/reviews/${reviewId}`, config);
+      await axios.delete(
+        `${API_BASE_URL}/api/admin/reviews/${reviewId}`,
+        config,
+      );
       fetchAdminData();
     } catch (err: unknown) {
       const errorMsg =
@@ -466,8 +468,7 @@ export default function AdminPage() {
         config,
       );
       alert(
-        "Cloudinary success: " +
-          (res.data.message || "Storage space freed!"),
+        "Cloudinary success: " + (res.data.message || "Storage space freed!"),
       );
       fetchAdminData();
     } catch (err: unknown) {
@@ -487,7 +488,10 @@ export default function AdminPage() {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      const res = await axios.get(`${API_BASE_URL}/api/admin/expo-builds`, config);
+      const res = await axios.get(
+        `${API_BASE_URL}/api/admin/expo-builds`,
+        config,
+      );
       alert(
         "Expo EAS status: " +
           (res.data.message || "Build queues checked successfully!"),
@@ -539,7 +543,9 @@ export default function AdminPage() {
     unit = "",
   ) => {
     if (used == null) return "Not connected";
-    const formattedUsed = Number.isInteger(used) ? String(used) : used.toFixed(2);
+    const formattedUsed = Number.isInteger(used)
+      ? String(used)
+      : used.toFixed(2);
     if (limit == null) return `${formattedUsed}${unit} used`;
     const formattedLimit = Number.isInteger(limit)
       ? String(limit)
@@ -907,15 +913,17 @@ export default function AdminPage() {
               ) : (
                 <>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-gray-300">
-                      MongoDB
-                    </span>
-                    <span className="text-sky-400 font-bold">
-                      {formatUsage(
-                        apiUsage.dbStorageUsedMB,
-                        apiUsage.dbLimitMB,
-                        " MB",
-                      )}
+                    <span className="font-semibold text-gray-300">MongoDB</span>
+                    <span
+                      className={`font-bold ${apiUsage.services?.atlas?.connected ? "text-emerald-400" : "text-sky-400"}`}
+                    >
+                      {apiUsage.services?.atlas?.connected
+                        ? "Connected"
+                        : formatUsage(
+                            apiUsage.dbStorageUsedMB,
+                            apiUsage.dbLimitMB,
+                            " MB",
+                          )}
                     </span>
                   </div>
                   {checkHighUsage(
@@ -937,9 +945,9 @@ export default function AdminPage() {
                       }}
                     ></div>
                   </div>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-[11px] text-gray-400">
                     {apiUsage.services?.atlas?.message ||
-                      "MongoDB Atlas monitoring credentials are required."}
+                      "MongoDB connected successfully via Mongoose."}
                   </p>
                 </>
               )}
@@ -954,9 +962,7 @@ export default function AdminPage() {
             >
               {flippedCard === "gemini" ? (
                 <div className="space-y-2 animate-fadeIn">
-                  <p className="text-xs font-bold text-amber-400">
-                    Gemini AI
-                  </p>
+                  <p className="text-xs font-bold text-amber-400">Gemini AI</p>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1027,9 +1033,7 @@ export default function AdminPage() {
             >
               {flippedCard === "expo" ? (
                 <div className="space-y-2 animate-fadeIn">
-                  <p className="text-xs font-bold text-purple-400">
-                    Expo EAS
-                  </p>
+                  <p className="text-xs font-bold text-purple-400">Expo EAS</p>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1316,9 +1320,7 @@ export default function AdminPage() {
               disabled={sendingBroadcast}
               className="bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold px-6 py-2.5 rounded-xl text-sm transition shadow-lg shadow-emerald-600/20 disabled:opacity-50"
             >
-              {sendingBroadcast
-                ? "Sending Broadcast..."
-                : "Send Broadcast Now"}
+              {sendingBroadcast ? "Sending Broadcast..." : "Send Broadcast Now"}
             </button>
           </form>
         </div>
