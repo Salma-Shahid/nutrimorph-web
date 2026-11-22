@@ -32,7 +32,7 @@ Global app state is managed centrally via `useAuthStore` using Zustand and persi
 - `login(email, password)`: Authenticates user, saves JWT token & profile to `AsyncStorage`.
 - `register(name, email, password)`: Creates new user account & initializes store.
 - `updateProfile(profileData)`: Syncs profile edits (name, height, weight, goal) with backend and updates local store.
-- `updateUserGlobally(data)`: Performs fast local state re-hydration (e.g., instant avatar updates or Pro plan activation).
+- `setUser(data)` / `updateUserStats(data)`: Updates local profile state; client state changes do not grant Pro access.
 - `toggleTheme()`: Toggles theme mode and persists `app_theme` setting.
 - `logout()`: Clears persistent storage and resets auth state to trigger conditional redirection to `LoginScreen`.
 
@@ -83,16 +83,11 @@ _Note: All top-level navigation relies on conditional state rendering driven by 
 
 ---
 
-## ⭐ 5. RevenueCat Pro Subscription Integration
+## ⭐ 5. Paddle Billing v2 Pro Subscriptions
 
-NutriMorph integrates RevenueCat (`react-native-purchases`) to handle digital entitlements:
+The web and mobile clients request authenticated, expiring checkout intents from the backend and open Paddle Checkout with the intent ID in checkout custom data. The backend verifies Paddle's raw-body webhook signature, checks the intent owner and configured price, and grants Pro only after a completed, positive-value transaction is confirmed by Paddle. Subscription lifecycle and payment-failure events update or revoke the entitlement. Client checkout completion does not activate Pro.
 
-- **Entitlement Key**: `nutrimorph_pro`
-- **Flow**:
-  1. `SubscriptionScreen` initializes `Purchases.configure()`.
-  2. Available packages are loaded via `Purchases.getOfferings()`.
-  3. Upon successful purchase or restoration (`handleRestore`), `updateUserGlobally({ subscriptionTier: "pro" })` is triggered.
-  4. `ProfileScreen` dynamically updates the Pro plan banner to display **"Pro Member Active 👑"**.
+Configure `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENV`, `PADDLE_PRICE_ID_MONTHLY`, and `PADDLE_PRICE_ID_YEARLY` on the backend. The web and Expo clients need their respective public client token, environment, and monthly/yearly price IDs. Keep all API and webhook secrets server-side. In Paddle, add the deployed backend URL `/api/payment/webhook` under Developer Tools → Notifications and subscribe to at least `transaction.completed`, `transaction.payment_failed`, `transaction.past_due`, `subscription.created`, `subscription.activated`, `subscription.updated`, `subscription.canceled`, `subscription.paused`, `subscription.resumed`, `payout.created`, and `payout.paid`. Confirm notification delivery and merchant payout eligibility in Paddle's dashboard; a Paddle-reported payout event is not proof of receipt by the bank.
 
 ---
 

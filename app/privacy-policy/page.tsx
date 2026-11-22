@@ -170,22 +170,12 @@ export default function PrivacyPolicy() {
               </li>
               <li>
                 <a
-                  href="https://www.revenuecat.com/privacy"
+                  href="https://www.paddle.com/legal/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:underline"
                 >
-                  RevenueCat
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://stripe.com/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline"
-                >
-                  Stripe
+                  Paddle
                 </a>
               </li>
               <li>

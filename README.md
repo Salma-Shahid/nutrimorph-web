@@ -1,6 +1,6 @@
 # 🥗 NutriMorph — AI Nutritionist & Macro Coach
 
-NutriMorph is an end-to-end, cross-platform AI-powered health and nutrition management platform. It allows users to track daily macros, analyze meal photos using Google Gemini AI, interact with a personalized voice/text conversational coach (**NutriBot**), and manage Pro subscriptions via RevenueCat.
+NutriMorph is an end-to-end, cross-platform AI-powered health and nutrition management platform. It allows users to track daily macros, analyze meal photos using Google Gemini AI, interact with a personalized voice/text conversational coach (**NutriBot**), and manage Pro subscriptions through Paddle Billing with webhook-verified entitlements.
 
 ---
 
@@ -11,7 +11,7 @@ NutriMorph is an end-to-end, cross-platform AI-powered health and nutrition mana
 - **🤖 NutriBot AI Assistant**: Smart conversational AI assistant capable of creating custom meal plans, evaluating macro goals, and giving personalized dietary advice.
 - **🌓 Global Light / Dark Mode**: Seamless theme switching managed through global Zustand state and persistent local storage.
 - **🔒 Dynamic Authentication & Profile Management**: Secure JWT-based authentication, user onboarding, profile updates, and image uploads.
-- **⭐ RevenueCat Subscription Integration**: Integrated Pro Plan upgrade flow supporting in-app purchases and entitlement verification.
+- **⭐ Verified Pro Subscriptions**: Paddle checkout intents are authenticated by the backend; only signed, completed paid transaction webhooks can grant Pro access.
 
 ---
 
@@ -23,7 +23,7 @@ NutriMorph is an end-to-end, cross-platform AI-powered health and nutrition mana
 - **Navigation**: React Navigation (Bottom Tabs Navigator + Native Stack)
 - **State Management**: Zustand (Global Auth, User Profile, Theme State)
 - **API Client**: Axios
-- **In-App Purchases**: RevenueCat SDK (`react-native-purchases`)
+- **Payments**: Paddle Billing v2; Pro entitlements are synchronized only by verified backend webhooks.
 - **Icons & UI**: Expo Vector Icons (`Ionicons`), Safe Area Context
 
 ### 2. Backend Service (`/nutrimorph-backend`)
@@ -45,20 +45,13 @@ NutriMorph is an end-to-end, cross-platform AI-powered health and nutrition mana
 
 ## ⚙️ Environment Variables Setup
 
-Ensure you configure `.env` files across your services before launching:
+Copy each `.env.example` to `.env` in its project and set the matching Paddle values:
 
-### Mobile App (`/nutrimorph/.env`)
+- **Web (`nutrimorph-web`)**: `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`, `NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID`, `NEXT_PUBLIC_PADDLE_YEARLY_PRICE_ID`, and `NEXT_PUBLIC_PADDLE_ENV` (`sandbox` or `production`). Legacy `VITE_PADDLE_*` names are supported through `next.config.ts`.
+- **Mobile (`nutrimorph`)**: `EXPO_PUBLIC_PADDLE_CLIENT_TOKEN`, `EXPO_PUBLIC_PADDLE_MONTHLY_PRICE_ID`, `EXPO_PUBLIC_PADDLE_YEARLY_PRICE_ID`, and `EXPO_PUBLIC_PADDLE_ENV`.
+- **Backend (`nutrimorph-backend`)**: `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENV`, `PADDLE_PRICE_ID_MONTHLY`, and `PADDLE_PRICE_ID_YEARLY`. The server-side price IDs must match the corresponding client IDs.
 
-env
-EXPO_PUBLIC_API_URL=[https://api.nutrimorph.app](https://api.nutrimorph.app)
-EXPO_PUBLIC_REVENUECAT_KEY=your_revenuecat_api_key
-
-Backend API (/nutrimorph-backend/.env)
-Code snippet
-PORT=5000
-MONGO_URI=your_mongodb_atlas_connection_string
-JWT_SECRET=your_jwt_secret_key
-GEMINI_API_KEY=your_google_gemini_api_key
+Never put `PADDLE_API_KEY` or `PADDLE_WEBHOOK_SECRET` in either client app. Production backend billing requires `PADDLE_ENV=production`; there are no secret-key fallbacks.
 🚀 Getting Started
 
 1. Run Mobile App

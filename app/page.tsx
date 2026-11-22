@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { initializePaddle, type Paddle } from "@paddle/paddle-js";
 import { API_BASE_URL } from "@/lib/api";
 import {
   Camera,
@@ -25,19 +26,16 @@ import {
   Loader2,
 } from "lucide-react";
 
-interface CheckoutPayload {
-  plan: string;
-  billingCycle: "monthly" | "yearly";
-  email: string;
-  aiModel: string;
-}
-
-interface CheckoutResponse {
-  url?: string;
-  message?: string;
+interface PlayStoreReview {
+  _id: string;
+  author?: string;
+  comment?: string;
+  rating?: number;
+  updatedAt?: string;
 }
 
 export default function Home() {
+  const paddleRef = useRef<Paddle | null>(null);
   const [isYearly, setIsYearly] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -60,6 +58,80 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [loginErrorMessage, setLoginErrorMessage] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [playStoreReviews, setPlayStoreReviews] = useState<PlayStoreReview[]>(
+    [],
+  );
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const token =
+      process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN ||
+      process.env.NEXT_PUBLIC_VITE_PADDLE_CLIENT_TOKEN ||
+      process.env.VITE_PADDLE_CLIENT_TOKEN;
+    const rawEnvironment =
+      process.env.NEXT_PUBLIC_PADDLE_ENV ||
+      process.env.NEXT_PUBLIC_VITE_PADDLE_ENV ||
+      process.env.VITE_PADDLE_ENV ||
+      "sandbox";
+    const environment =
+      rawEnvironment === "production"
+        ? "production"
+        : rawEnvironment === "sandbox"
+          ? "sandbox"
+          : null;
+    if (!token || !environment) {
+      return () => {
+        active = false;
+      };
+    }
+
+    initializePaddle({
+      token,
+      environment,
+    })
+      .then((paddle) => {
+        if (active && paddle) paddleRef.current = paddle;
+      })
+      .catch((error: unknown) => {
+        console.error("Could not initialize Paddle:", error);
+        if (active) setErrorMessage("Secure checkout could not be initialized.");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const fetchReviews = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/reviews`, {
+          cache: "no-store",
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result?.message || "Could not load Play Store reviews.");
+        }
+        if (active) setPlayStoreReviews(result?.data || []);
+      } catch (error) {
+        if (active) {
+          setReviewsError(
+            error instanceof Error ? error.message : "Could not load reviews.",
+          );
+        }
+      } finally {
+        if (active) setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     if (typeof window !== "undefined") {
@@ -127,7 +199,7 @@ export default function Home() {
     const queryParams = new URLSearchParams(window.location.search);
     const paymentStatus = queryParams.get("payment");
 
-    if (paymentStatus !== "success") return;
+    if (paymentStatus !== "pending") return;
 
     const verifySubscription = async () => {
       try {
@@ -145,14 +217,15 @@ export default function Home() {
           );
         }
         const profile = result?.user || result;
-        if (profile.subscriptionTier !== "pro" && profile.isPro !== true) {
-          throw new Error(
-            "The subscription is not active yet. Please try again.",
+        if (profile.subscriptionTier === "pro" && profile.isPro === true) {
+          setCurrentPlan("pro");
+          localStorage.setItem("userPlan", "pro");
+          alert("Your payment was verified and Pro is active.");
+        } else {
+          alert(
+            "Checkout completed. Pro access will appear after Paddle's verified payment webhook is processed.",
           );
         }
-        setCurrentPlan("pro");
-        localStorage.setItem("userPlan", "pro");
-        alert("Payment successful. Your Pro plan is active.");
       } catch (error) {
         console.error(
           "Could not verify the subscription after checkout:",
@@ -260,7 +333,7 @@ export default function Home() {
       try {
         setLoading(true);
         const response = await fetch(
-          `${API_BASE_URL}/api/payment/update-plan`,
+          `${API_BASE_URL}/api/payment/cancel-subscription`,
           {
             method: "POST",
             headers: {
@@ -268,18 +341,16 @@ export default function Home() {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              plan: "Free",
               aiModel: "gemini-3.5-flash-lite",
             }),
           },
         );
 
-        if (response.ok) {
-          localStorage.setItem("userPlan", "Free");
-          setCurrentPlan("Free");
-          alert("Plan successfully changed to Free!");
-          window.location.reload();
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || "Could not update the subscription.");
         }
+        alert(result.message || "Your subscription settings were updated.");
       } catch (err: unknown) {
         if (err instanceof Error) {
           alert("Plan sync error: " + err.message);
@@ -295,70 +366,105 @@ export default function Home() {
     setErrorMessage("");
   };
 
-  // Helper function for Pro Plan Checkout (Ab yeh handleSubscriptionCheckout ke andar use hoga)
-  const processBackendCheckout = async (
-    payload: CheckoutPayload,
-    token: string | null,
-  ): Promise<CheckoutResponse> => {
-    const res = await fetch(
-      `${API_BASE_URL}/api/payment/create-checkout-session`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ` + token } : {}),
-        },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    const data = await res.json();
-    if (!res.ok)
-      throw new Error(data.message || "Backend payment processing failed");
-    return data;
-  };
-  // Main Checkout Handler
-  const handleSubscriptionCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      setErrorMessage("Please enter your registered email address.");
-      return;
+  const openPaddleCheckout = async (
+    priceId: string,
+    billingCycle: "monthly" | "yearly",
+  ) => {
+    const paddleEnvironment =
+      process.env.NEXT_PUBLIC_PADDLE_ENV ||
+      process.env.NEXT_PUBLIC_VITE_PADDLE_ENV ||
+      process.env.VITE_PADDLE_ENV ||
+      "sandbox";
+    if (!["sandbox", "production"].includes(paddleEnvironment)) {
+      throw new Error("PADDLE_ENV must be sandbox or production.");
     }
-
-    setLoading(true);
-    setErrorMessage("");
-
+    if (
+      !process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN &&
+      !process.env.NEXT_PUBLIC_VITE_PADDLE_CLIENT_TOKEN &&
+      !process.env.VITE_PADDLE_CLIENT_TOKEN
+    ) {
+      throw new Error("Paddle checkout is not configured.");
+    }
+    const paddle = paddleRef.current;
+    if (!paddle) {
+      throw new Error("Paddle checkout is still loading. Please try again.");
+    }
     try {
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("Not authorized. Please log in to your account first.");
       }
 
-      // Yahan helper function ko call kiya gaya hai (unused error fix)
-      const data = await processBackendCheckout(
+      const response = await fetch(
+        `${API_BASE_URL}/api/payment/create-checkout-intent`,
         {
-          plan: selectedPlan,
-          billingCycle: isYearly ? "yearly" : "monthly",
-          email: email,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ billingCycle }),
+        },
+      );
+      const intent = await response.json();
+      if (!response.ok) {
+        throw new Error(intent.message || "Could not prepare Paddle checkout.");
+      }
+      if (intent.priceId !== priceId || !intent.intentId || !intent.email) {
+        throw new Error(
+          "The selected Paddle price does not match the backend checkout intent.",
+        );
+      }
+
+      paddle.Checkout.open({
+        items: [{ priceId: intent.priceId, quantity: 1 }],
+        customer: { email: intent.email || email },
+        customData: {
+          checkoutIntentId: intent.intentId,
+          planTier: "Pro",
+          billingCycle,
           aiModel: "gemini-3.5-flash-lite",
         },
-        token,
-      );
+        settings: {
+          displayMode: "overlay",
+          theme: "dark",
+          successUrl: `${window.location.origin}/?payment=pending`,
+        },
+      });
+    } catch (error: unknown) {
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to prepare Paddle checkout.");
+    }
+  };
 
-      if (data.url) {
-        window.location.assign(data.url);
-      } else {
-        throw new Error("Invalid payment gateway response.");
-      }
+  const handleSubscriptionCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const billingCycle = isYearly ? "yearly" : "monthly";
+    const priceId =
+      billingCycle === "yearly"
+        ? process.env.NEXT_PUBLIC_PADDLE_YEARLY_PRICE_ID ||
+          process.env.NEXT_PUBLIC_VITE_PADDLE_YEARLY_PRICE_ID ||
+          process.env.VITE_PADDLE_YEARLY_PRICE_ID
+        : process.env.NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID ||
+          process.env.NEXT_PUBLIC_VITE_PADDLE_MONTHLY_PRICE_ID ||
+          process.env.VITE_PADDLE_MONTHLY_PRICE_ID;
+    if (!priceId) {
+      setErrorMessage(`Paddle ${billingCycle} price is not configured.`);
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      await openPaddleCheckout(priceId, billingCycle);
     } catch (err: unknown) {
       if (err instanceof Error) {
-        if (err.message.includes("Failed to fetch")) {
-          setErrorMessage(
-            "Backend is waking up or unreachable. Please try again in 30 seconds.",
-          );
-        } else {
-          setErrorMessage(err.message);
-        }
+        setErrorMessage(
+          err.message.includes("Failed to fetch")
+            ? "Backend is waking up or unreachable. Please try again shortly."
+            : err.message,
+        );
       } else {
         setErrorMessage("Failed to process payment. Please try again.");
       }
@@ -683,88 +789,63 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between relative">
-            <Quote className="absolute top-6 right-6 w-8 h-8 text-emerald-500/10" />
-            <div>
-              <div className="flex space-x-1 text-amber-400 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-amber-400" />
-                ))}
-              </div>
-              <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                &ldquo;The food scanning feature is an absolute game changer! It
-                accurately guesses macros within seconds. Saved me hours of
-                manual logging.&rdquo;
-              </p>
-            </div>
-            <div className="flex items-center space-x-3 border-t border-slate-800/80 pt-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center font-bold justify-center text-sm">
-                JD
-              </div>
-              <div>
-                <h4 className="text-white text-sm font-semibold">
-                  Jonathan Davis
-                </h4>
-                <p className="text-slate-500 text-xs">Google Play User</p>
-              </div>
-            </div>
+        {reviewsLoading ? (
+          <div className="text-center text-slate-400">Loading reviews…</div>
+        ) : reviewsError ? (
+          <div className="text-center text-slate-400">
+            Play Store reviews are temporarily unavailable.
           </div>
-
-          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between relative">
-            <Quote className="absolute top-6 right-6 w-8 h-8 text-emerald-500/10" />
-            <div>
-              <div className="flex space-x-1 text-amber-400 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-amber-400" />
-                ))}
-              </div>
-              <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                &ldquo;NutriBot AI coach feels like having a real dietician in
-                my pocket. Whenever I feel stuck on my diet, it gives me instant
-                custom adjustments!&rdquo;
-              </p>
-            </div>
-            <div className="flex items-center space-x-3 border-t border-slate-800/80 pt-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center font-bold justify-center text-sm">
-                SM
-              </div>
-              <div>
-                <h4 className="text-white text-sm font-semibold">
-                  Sarah Miller
-                </h4>
-                <p className="text-slate-500 text-xs">Google Play User</p>
-              </div>
-            </div>
+        ) : playStoreReviews.length === 0 ? (
+          <div className="text-center text-slate-400">
+            No public Play Store reviews are available yet.
           </div>
-
-          <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between relative">
-            <Quote className="absolute top-6 right-6 w-8 h-8 text-emerald-500/10" />
-            <div>
-              <div className="flex space-x-1 text-amber-400 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-amber-400" />
-                ))}
-              </div>
-              <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                &ldquo;Clean UI, fast Stripe checkout, and zero lags. The pro
-                plan is totally worth every penny for anyone serious about
-                bodybuilding.&rdquo;
-              </p>
-            </div>
-            <div className="flex items-center space-x-3 border-t border-slate-800/80 pt-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center font-bold justify-center text-sm">
-                AK
-              </div>
-              <div>
-                <h4 className="text-white text-sm font-semibold">
-                  Alex Walker
-                </h4>
-                <p className="text-slate-500 text-xs">Google Play User</p>
-              </div>
-            </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-8">
+            {playStoreReviews.slice(0, 6).map((review) => {
+              const author = review.author?.trim() || "Google Play user";
+              const initials =
+                author
+                  .split(/\s+/)
+                  .map((part) => part[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase() || "GP";
+              const rating = Math.min(5, Math.max(0, Number(review.rating) || 0));
+              return (
+                <article
+                  key={review._id}
+                  className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl flex flex-col justify-between relative"
+                >
+                  <Quote className="absolute top-6 right-6 w-8 h-8 text-emerald-500/10" />
+                  <div>
+                    <div className="flex space-x-1 text-amber-400 mb-4">
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <Star
+                          key={index}
+                          className={`w-4 h-4 ${index < rating ? "fill-amber-400" : ""}`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-slate-300 text-sm leading-relaxed mb-6 whitespace-pre-wrap">
+                      {review.comment || "No review text provided."}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-3 border-t border-slate-800/80 pt-4">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center font-bold justify-center text-sm">
+                      {initials}
+                    </div>
+                    <div>
+                      <h4 className="text-white text-sm font-semibold">
+                        {author}
+                      </h4>
+                      <p className="text-slate-500 text-xs">Google Play review</p>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-        </div>
+        )}
       </section>
 
       {/* FAQ Section */}
@@ -984,7 +1065,7 @@ export default function Home() {
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              Yearly (Save 20%)
+              Yearly
             </button>
           </div>
         </div>
@@ -1016,8 +1097,11 @@ export default function Home() {
                 Advanced AI scanning & deep macro breakdown.
               </p>
               <div className="text-3xl font-extrabold text-white mb-6">
-                {isYearly ? "$99/yr" : "$9.99/mo"}
+                {isYearly ? "Yearly billing" : "Monthly billing"}
               </div>
+              <p className="text-slate-400 text-sm mb-6">
+                Final amount and currency are shown in secure Paddle Checkout.
+              </p>
             </div>
             <button
               onClick={() => handlePlanSelect("Pro Plan")}

@@ -116,7 +116,7 @@ export default function TermsOfService() {
               Free tier users receive up to 5 daily AI chat messages. Upgrading
               to the Pro plan provides unlimited AI access and premium tracking.
               Billing, payments, and recurring renewals are processed directly
-              via Google Play Billing or Stripe.
+              through Paddle Billing.
             </p>
           </div>
 
@@ -181,22 +181,12 @@ export default function TermsOfService() {
               </li>
               <li>
                 <a
-                  href="https://www.revenuecat.com/terms"
+                  href="https://www.paddle.com/legal/terms"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:underline"
                 >
-                  RevenueCat
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://stripe.com/legal"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline"
-                >
-                  Stripe
+                  Paddle
                 </a>
               </li>
               <li>

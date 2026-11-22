@@ -30,6 +30,8 @@ interface UserData {
 
 interface ReviewData {
   _id: string;
+  author?: string;
+  isHidden?: boolean;
   user?: { name: string; email: string };
   rating: number;
   comment: string;
@@ -48,8 +50,16 @@ interface GatewayHealthData {
   gatewayName: string;
   status: string;
   activeWebhooks: number | null;
-  failedWebhooksLast24h: number | null;
+  pendingWebhookEvents: number | null;
+  verifiedTransactions30d: number | null;
   totalTransactionVolumeUSD: number | null;
+  payouts?: Array<{
+    status: string;
+    amount: number;
+    currencyCode: string;
+    remittanceReference?: string;
+    lastEventAt: string;
+  }>;
   message?: string;
 }
 
@@ -113,7 +123,13 @@ const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
   ],
-  "Stripe & Billing": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+  "Paddle & Billing": [
+    "PADDLE_API_KEY",
+    "PADDLE_WEBHOOK_SECRET",
+    "PADDLE_ENV",
+    "PADDLE_PRICE_ID_MONTHLY",
+    "PADDLE_PRICE_ID_YEARLY",
+  ],
 };
 
 export default function AdminPage() {
@@ -198,7 +214,7 @@ export default function AdminPage() {
       setUsers(usersRes.data.data);
       setReviews(reviewsRes.data.data || []);
       setLogs(logsRes.data.data || []);
-      setApiUsage(usageRes.data.data);
+      setApiUsage(usageRes.data.data || EMPTY_API_USAGE);
       setGatewayHealth(gatewayRes.data.data);
 
       try {
@@ -212,7 +228,7 @@ export default function AdminPage() {
         setRevenue(null);
         setRevenueStatus(
           (revenueError as { response?: { data?: { message?: string } } })
-            ?.response?.data?.message || "Live Stripe revenue is unavailable.",
+            ?.response?.data?.message || "Verified Paddle revenue is unavailable.",
         );
       }
     } catch (err: unknown) {
@@ -269,28 +285,13 @@ export default function AdminPage() {
     });
   }, [users, searchTerm, tierFilter]);
 
-  const handleToggleTier = async (userId: string, currentTier?: string) => {
-    try {
-      const newTier = currentTier === "pro" ? "free" : "pro";
-      const token = localStorage.getItem("token");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-
-      await axios.patch(
-        `${API_BASE_URL}/api/admin/users/${userId}/tier`,
-        { subscriptionTier: newTier },
-        config,
-      );
-      fetchAdminData();
-    } catch (err: unknown) {
-      const errorMsg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || (err instanceof Error ? err.message : "Unknown error");
-      alert("Failed to update tier: " + errorMsg);
-    }
-  };
-
   const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    if (
+      !window.confirm(
+        "Deactivate this user account? They can recover it within 30 days.",
+      )
+    )
+      return;
     try {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -306,7 +307,12 @@ export default function AdminPage() {
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    if (!window.confirm("Are you sure you want to delete this review?")) return;
+    if (
+      !window.confirm(
+        "Remove this review from the public website? It will remain hidden if Play Store sync imports it again.",
+      )
+    )
+      return;
     try {
       const token = localStorage.getItem("token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -647,7 +653,7 @@ export default function AdminPage() {
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between hover:border-emerald-500/40 transition">
               <div>
                 <p className="text-gray-400 text-sm font-medium">
-                  Stripe Transaction Volume (30 days)
+                  Paddle Verified Transaction Volume (30 days, USD)
                 </p>
                 <p className="text-3xl font-extrabold text-emerald-400 mt-2">
                   ${revenue.totalRevenue.toFixed(2)}{" "}
@@ -791,7 +797,7 @@ export default function AdminPage() {
               {/* DIRECT BILLING & CONFIG ACTION BUTTON */}
               <button
                 onClick={() => {
-                  setSelectedService("Stripe & Billing");
+                  setSelectedService("Paddle & Billing");
                   setIsConfigModalOpen(true);
                 }}
                 className="bg-gray-950 hover:bg-gray-800 border border-amber-500/40 text-amber-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 hover:scale-[1.02]"
@@ -1178,11 +1184,10 @@ export default function AdminPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-200">
-                  Payment Gateways & Webhook Health
+                  Payment Settlement & Webhook Health
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
-                  Monitor live transaction flow, gateway statuses, and webhook
-                  event deliveries.
+                  Monitor verified Paddle transactions. Configure notifications and review merchant payouts in Paddle.
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -1194,7 +1199,7 @@ export default function AdminPage() {
                   disabled={testingWebhook}
                   className="bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold px-4 py-1.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {testingWebhook ? "Testing..." : "Test Webhook Ping"}
+                  {testingWebhook ? "Checking..." : "Check Paddle Configuration"}
                 </button>
               </div>
             </div>
@@ -1210,24 +1215,57 @@ export default function AdminPage() {
               </div>
               <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
                 <p className="text-gray-400 text-xs font-medium">
-                  Active Webhooks
+                  Verified Transactions (30 days)
                 </p>
                 <p className="text-lg font-bold text-sky-400">
-                  {gatewayHealth.activeWebhooks == null
+                  {gatewayHealth.verifiedTransactions30d == null
                     ? "Unavailable"
-                    : `${gatewayHealth.activeWebhooks} endpoints`}
+                    : gatewayHealth.verifiedTransactions30d}
                 </p>
               </div>
               <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
                 <p className="text-gray-400 text-xs font-medium">
-                  Pending Delivery Events (30 days)
+                  Pending Event Processing
                 </p>
                 <p className="text-lg font-bold text-amber-400">
-                  {gatewayHealth.failedWebhooksLast24h == null
+                  {gatewayHealth.pendingWebhookEvents == null
                     ? "Unavailable"
-                    : `${gatewayHealth.failedWebhooksLast24h} events`}
+                    : `${gatewayHealth.pendingWebhookEvents} events`}
                 </p>
               </div>
+            </div>
+            <div className="rounded-xl border border-gray-800 overflow-hidden">
+              <div className="px-4 py-3 bg-gray-950 text-sm font-semibold text-gray-300">
+                Recent Paddle-reported payouts
+              </div>
+              {gatewayHealth.payouts?.length ? (
+                <div className="divide-y divide-gray-800">
+                  {gatewayHealth.payouts.map((payout) => (
+                    <div
+                      key={payout.remittanceReference || payout.lastEventAt}
+                      className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-sm"
+                    >
+                      <span className="text-gray-300">
+                        {payout.status} · {payout.currencyCode.toUpperCase()}{" "}
+                        {payout.amount.toFixed(2)}
+                      </span>
+                      <span className="text-gray-500">
+                        {payout.remittanceReference || ""}
+                        {payout.remittanceReference ? " · " : ""}
+                        {new Date(payout.lastEventAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-4 py-3 text-sm text-gray-500">
+                  No Paddle payout notifications have been recorded.
+                </p>
+              )}
+              <p className="px-4 py-3 text-xs text-gray-500">
+                Payout status reflects Paddle&apos;s notification; confirm
+                deposit receipt with Paddle and your bank.
+              </p>
             </div>
           </div>
         )}
@@ -1392,7 +1430,7 @@ export default function AdminPage() {
                   <th className="p-4">User</th>
                   <th className="p-4">Rating</th>
                   <th className="p-4">Comment</th>
-                  <th className="p-4">Actions</th>
+                  <th className="p-4">Account</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/60 text-sm">
@@ -1403,23 +1441,32 @@ export default function AdminPage() {
                       className="hover:bg-gray-850/50 transition"
                     >
                       <td className="p-4 font-semibold text-gray-200">
-                        {rev.user?.name || "Anonymous"}{" "}
+                        {rev.author || rev.user?.name || "Google Play user"}{" "}
                         <span className="text-xs text-gray-400 block">
-                          {rev.user?.email}
+                          {rev.user?.email || "Google Play"}
                         </span>
                       </td>
                       <td className="p-4 text-amber-400 font-bold">
                         Rating: {rev.rating}/5
-                        {"☆".repeat(5 - rev.rating)} ({rev.rating}/5)
+                        {"☆".repeat(
+                          Math.max(0, 5 - (Number(rev.rating) || 0)),
+                        )}{" "}
+                        ({rev.rating}/5)
                       </td>
                       <td className="p-4 text-gray-300">{rev.comment}</td>
                       <td className="p-4">
-                        <button
-                          onClick={() => handleDeleteReview(rev._id)}
-                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
-                        >
-                          Delete Review
-                        </button>
+                        {rev.isHidden ? (
+                          <span className="text-xs text-gray-500">
+                            Hidden from website
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteReview(rev._id)}
+                            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
+                          >
+                            Delete Review
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -1505,21 +1552,13 @@ export default function AdminPage() {
                           {user.subscriptionTier || "free"}
                         </span>
                       </td>
-                      <td className="p-4 flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            handleToggleTier(user._id, user.subscriptionTier)
-                          }
-                          className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium transition"
-                        >
-                          Toggle Tier
-                        </button>
+                      <td className="p-4">
                         {user.role !== "admin" && (
                           <button
                             onClick={() => handleDeleteUser(user._id)}
                             className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-xs font-medium transition"
                           >
-                            Delete
+                            Deactivate
                           </button>
                         )}
                       </td>
