@@ -96,7 +96,8 @@ export default function Home() {
       })
       .catch((error: unknown) => {
         console.error("Could not initialize Paddle:", error);
-        if (active) setErrorMessage("Secure checkout could not be initialized.");
+        if (active)
+          setErrorMessage("Secure checkout could not be initialized.");
       });
 
     return () => {
@@ -113,7 +114,9 @@ export default function Home() {
         });
         const result = await response.json();
         if (!response.ok) {
-          throw new Error(result?.message || "Could not load Play Store reviews.");
+          throw new Error(
+            result?.message || "Could not load Play Store reviews.",
+          );
         }
         if (active) setPlayStoreReviews(result?.data || []);
       } catch (error) {
@@ -348,7 +351,9 @@ export default function Home() {
 
         const result = await response.json();
         if (!response.ok) {
-          throw new Error(result.message || "Could not update the subscription.");
+          throw new Error(
+            result.message || "Could not update the subscription.",
+          );
         }
         alert(result.message || "Your subscription settings were updated.");
       } catch (err: unknown) {
@@ -810,7 +815,10 @@ export default function Home() {
                   .slice(0, 2)
                   .join("")
                   .toUpperCase() || "GP";
-              const rating = Math.min(5, Math.max(0, Number(review.rating) || 0));
+              const rating = Math.min(
+                5,
+                Math.max(0, Number(review.rating) || 0),
+              );
               return (
                 <article
                   key={review._id}
@@ -838,7 +846,9 @@ export default function Home() {
                       <h4 className="text-white text-sm font-semibold">
                         {author}
                       </h4>
-                      <p className="text-slate-500 text-xs">Google Play review</p>
+                      <p className="text-slate-500 text-xs">
+                        Google Play review
+                      </p>
                     </div>
                   </div>
                 </article>
@@ -1280,6 +1290,9 @@ export default function Home() {
             </Link>
             <Link href="/terms" className="hover:text-emerald-400 transition">
               Terms & Conditions
+            </Link>
+            <Link href="/refund" className="hover:text-emerald-400 transition">
+              Refund Policy
             </Link>
             <Link
               href="/delete-account"
