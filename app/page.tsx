@@ -34,8 +34,52 @@ interface PlayStoreReview {
   updatedAt?: string;
 }
 
+// Parses JSON without throwing on empty/HTML error pages (e.g. a cold-start 504).
+const readJson = async (response: Response) => {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+};
+
+// fetch with a timeout so buttons never stay stuck on "Processing...".
+const fetchWithTimeout = async (
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 20000,
+) => {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The server took too long to respond. Please try again.");
+    }
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Backend is waking up or unreachable. Please try again shortly.",
+      );
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
+
 export default function Home() {
   const paddleRef = useRef<Paddle | null>(null);
+  // Resolves once Paddle.js has loaded (or null if it can't), so a click made
+  // while it is still loading waits instead of failing.
+  const paddleReadyRef = useRef<Promise<Paddle | null> | null>(null);
+  // null = not checked yet; true/false from GET /api/payment/config.
+  const [webCheckoutAvailable, setWebCheckoutAvailable] = useState<
+    boolean | null
+  >(null);
+  const [webCheckoutMessage, setWebCheckoutMessage] = useState("");
+  const [planActionLoading, setPlanActionLoading] = useState(false);
+  const [billingProvider, setBillingProvider] = useState<string | null>(null);
   const [isYearly, setIsYearly] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -64,8 +108,8 @@ export default function Home() {
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState("");
 
+  // Paddle.js is a singleton, so this is safe to run once and keep.
   useEffect(() => {
-    let active = true;
     const token =
       process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN ||
       process.env.NEXT_PUBLIC_VITE_PADDLE_CLIENT_TOKEN ||
@@ -82,24 +126,45 @@ export default function Home() {
           ? "sandbox"
           : null;
     if (!token || !environment) {
-      return () => {
-        active = false;
-      };
+      paddleReadyRef.current = Promise.resolve(null);
+      return;
     }
 
-    initializePaddle({
+    paddleReadyRef.current = initializePaddle({
       token,
       environment,
     })
       .then((paddle) => {
-        if (active && paddle) paddleRef.current = paddle;
+        if (paddle) paddleRef.current = paddle;
+        return paddle || null;
       })
       .catch((error: unknown) => {
         console.error("Could not initialize Paddle:", error);
-        if (active)
-          setErrorMessage("Secure checkout could not be initialized.");
+        return null;
       });
+  }, []);
 
+  // Which billing options the backend supports (no secrets). RevenueCat is
+  // app-only; Paddle web checkout is an optional fallback.
+  useEffect(() => {
+    let active = true;
+    fetchWithTimeout(`${API_BASE_URL}/api/payment/config`, { cache: "no-store" })
+      .then(readJson)
+      .then((result) => {
+        if (!active) return;
+        const paddle = result?.data?.paddle;
+        setWebCheckoutAvailable(Boolean(paddle?.configured));
+        setWebCheckoutMessage(
+          paddle?.configured
+            ? ""
+            : paddle?.message ||
+                "Web checkout is not available yet. Subscribe in the NutriMorph mobile app.",
+        );
+      })
+      .catch(() => {
+        // Unknown: let the user try; the checkout request reports the reason.
+        if (active) setWebCheckoutAvailable(null);
+      });
     return () => {
       active = false;
     };
@@ -149,24 +214,32 @@ export default function Home() {
       if (!token) return;
 
       try {
-        const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+        const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          cache: "no-store",
         });
 
+        if (res.status === 401 || res.status === 403) {
+          // Expired/deactivated session: show the signed-out state.
+          localStorage.removeItem("token");
+          localStorage.removeItem("userPlan");
+          setIsLoggedIn(false);
+          setCurrentPlan("Free");
+          return;
+        }
+
         if (res.ok) {
-          const data = await res.json();
-          // Check user object or root level response
+          const data = await readJson(res);
           const userObj = data?.user || data;
 
-          const isProUser =
-            userObj?.subscriptionTier === "pro" || userObj?.isPro === true;
-          const userPlan = isProUser ? "pro" : "Free";
-
-          const userEmail = userObj?.email || userObj?.name || "";
+          // The server's isPro already accounts for expiry and status.
+          const userPlan = userObj?.isPro === true ? "pro" : "Free";
+          const userEmail = userObj?.email || "";
 
           setCurrentPlan(userPlan);
+          setBillingProvider(userObj?.billingProvider || null);
           localStorage.setItem("userPlan", userPlan);
 
           if (userEmail) {
@@ -283,10 +356,7 @@ export default function Home() {
 
         const loggedInEmail = data?.user?.email || data?.email || email;
         const loggedInPlan =
-          data?.user?.subscriptionPlan ||
-          data?.user?.plan ||
-          data?.plan ||
-          "Free";
+          (data?.user?.isPro ?? data?.isPro) === true ? "pro" : "Free";
 
         if (loggedInEmail) {
           setEmail(loggedInEmail);
@@ -333,9 +403,27 @@ export default function Home() {
     }
 
     if (planName === "Free Plan") {
+      if (currentPlan.toLowerCase() !== "pro") {
+        alert("You're already on the Free plan.");
+        return;
+      }
+      if (planActionLoading) return;
+      if (billingProvider === "admin") {
+        alert(
+          "Your Pro access was granted by NutriMorph support, so there is no subscription to cancel. Contact support to change it.",
+        );
+        return;
+      }
+      if (
+        !window.confirm(
+          "Switch to the Free plan? Your Pro subscription will be cancelled at the end of the current billing period.",
+        )
+      ) {
+        return;
+      }
+      setPlanActionLoading(true);
       try {
-        setLoading(true);
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${API_BASE_URL}/api/payment/cancel-subscription`,
           {
             method: "POST",
@@ -343,36 +431,45 @@ export default function Home() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-              aiModel: "gemini-3.5-flash-lite",
-            }),
+            body: JSON.stringify({}),
           },
         );
 
-        const result = await response.json();
+        const result = await readJson(response);
         if (!response.ok) {
           throw new Error(
             result.message || "Could not update the subscription.",
           );
         }
-        alert(result.message || "Your subscription settings were updated.");
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          alert("Plan sync error: " + err.message);
+        if (result.manageInStore && result.manageUrl) {
+          // Store subscriptions can only be cancelled in the store.
+          if (window.confirm(`${result.message}\n\nOpen your store subscriptions page?`)) {
+            window.open(result.manageUrl, "_blank", "noopener,noreferrer");
+          }
         } else {
-          alert("Plan sync error: An unknown error occurred.");
+          alert(result.message || "Your subscription settings were updated.");
         }
+      } catch (err: unknown) {
+        alert(
+          "Plan update error: " +
+            (err instanceof Error ? err.message : "An unknown error occurred."),
+        );
+      } finally {
+        setPlanActionLoading(false);
       }
       return;
     }
 
     setSelectedPlan(planName);
+    setLoading(false);
+    setErrorMessage(
+      webCheckoutAvailable === false ? webCheckoutMessage : "",
+    );
     setShowSubModal(true);
-    setErrorMessage("");
   };
 
   const openPaddleCheckout = async (
-    priceId: string,
+    clientPriceId: string | undefined,
     billingCycle: "monthly" | "yearly",
   ) => {
     const paddleEnvironment =
@@ -381,18 +478,28 @@ export default function Home() {
       process.env.VITE_PADDLE_ENV ||
       "sandbox";
     if (!["sandbox", "production"].includes(paddleEnvironment)) {
-      throw new Error("PADDLE_ENV must be sandbox or production.");
+      throw new Error("NEXT_PUBLIC_PADDLE_ENV must be sandbox or production.");
     }
     if (
       !process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN &&
       !process.env.NEXT_PUBLIC_VITE_PADDLE_CLIENT_TOKEN &&
       !process.env.VITE_PADDLE_CLIENT_TOKEN
     ) {
-      throw new Error("Paddle checkout is not configured.");
+      throw new Error(
+        "Web checkout is not configured on this site. Subscribe in the NutriMorph mobile app.",
+      );
     }
-    const paddle = paddleRef.current;
+    // Wait (bounded) for Paddle.js if the click came before it finished loading.
+    const paddle =
+      paddleRef.current ||
+      (await Promise.race([
+        paddleReadyRef.current || Promise.resolve(null),
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 10000)),
+      ]));
     if (!paddle) {
-      throw new Error("Paddle checkout is still loading. Please try again.");
+      throw new Error(
+        "Secure checkout could not be loaded. Disable ad/script blockers and try again.",
+      );
     }
     try {
       const token = localStorage.getItem("token");
@@ -400,7 +507,7 @@ export default function Home() {
         throw new Error("Not authorized. Please log in to your account first.");
       }
 
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `${API_BASE_URL}/api/payment/create-checkout-intent`,
         {
           method: "POST",
@@ -411,13 +518,23 @@ export default function Home() {
           body: JSON.stringify({ billingCycle }),
         },
       );
-      const intent = await response.json();
+      const intent = await readJson(response);
       if (!response.ok) {
+        if (response.status === 409) {
+          // Already Pro on the server: sync the UI instead of erroring.
+          setCurrentPlan("pro");
+          localStorage.setItem("userPlan", "pro");
+          setShowSubModal(false);
+        }
         throw new Error(intent.message || "Could not prepare Paddle checkout.");
       }
-      if (intent.priceId !== priceId || !intent.intentId || !intent.email) {
-        throw new Error(
-          "The selected Paddle price does not match the backend checkout intent.",
+      if (!intent.priceId || !intent.intentId || !intent.email) {
+        throw new Error("The server returned an incomplete checkout. Please try again.");
+      }
+      // The backend price is authoritative; a stale site env var shouldn't block checkout.
+      if (clientPriceId && clientPriceId !== intent.priceId) {
+        console.warn(
+          `NEXT_PUBLIC_PADDLE_${billingCycle.toUpperCase()}_PRICE_ID differs from the backend price; using the backend price.`,
         );
       }
 
@@ -454,8 +571,9 @@ export default function Home() {
         : process.env.NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID ||
           process.env.NEXT_PUBLIC_VITE_PADDLE_MONTHLY_PRICE_ID ||
           process.env.VITE_PADDLE_MONTHLY_PRICE_ID;
-    if (!priceId) {
-      setErrorMessage(`Paddle ${billingCycle} price is not configured.`);
+    if (loading) return;
+    if (webCheckoutAvailable === false) {
+      setErrorMessage(webCheckoutMessage);
       return;
     }
 
@@ -463,16 +581,14 @@ export default function Home() {
     setErrorMessage("");
     try {
       await openPaddleCheckout(priceId, billingCycle);
+      // The overlay is open; close our modal so it doesn't sit behind it.
+      setShowSubModal(false);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setErrorMessage(
-          err.message.includes("Failed to fetch")
-            ? "Backend is waking up or unreachable. Please try again shortly."
-            : err.message,
-        );
-      } else {
-        setErrorMessage("Failed to process payment. Please try again.");
-      }
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : "Failed to process payment. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -1091,9 +1207,15 @@ export default function Home() {
             </div>
             <button
               onClick={() => handlePlanSelect("Free Plan")}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition"
+              disabled={planActionLoading}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Get Started Free
+              {planActionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {planActionLoading
+                ? "Updating..."
+                : currentPlan.toLowerCase() === "pro"
+                  ? "Switch to Free"
+                  : "Get Started Free"}
             </button>
           </div>
 
@@ -1117,7 +1239,7 @@ export default function Home() {
               onClick={() => handlePlanSelect("Pro Plan")}
               className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition"
             >
-              Select Pro
+              {currentPlan.toLowerCase() === "pro" ? "Current Plan" : "Select Pro"}
             </button>
           </div>
         </div>
@@ -1128,8 +1250,12 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl relative shadow-2xl">
             <button
-              onClick={() => setShowSubModal(false)}
+              onClick={() => {
+                setShowSubModal(false);
+                setErrorMessage("");
+              }}
               className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              aria-label="Close checkout"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1174,12 +1300,16 @@ export default function Home() {
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition flex items-center justify-center space-x-2 disabled:opacity-50"
+                disabled={loading || webCheckoutAvailable === false}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>
-                  {loading ? "Processing..." : "Proceed to Secure Checkout"}
+                  {loading
+                    ? "Opening secure checkout..."
+                    : webCheckoutAvailable === false
+                      ? "Web checkout unavailable"
+                      : "Proceed to Secure Checkout"}
                 </span>
               </button>
             </form>
