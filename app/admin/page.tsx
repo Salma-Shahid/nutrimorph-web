@@ -24,9 +24,25 @@ interface UserData {
   email: string;
   role?: string;
   subscriptionTier?: string;
+  subscriptionStatus?: string;
+  subscriptionExpiresAt?: string | null;
+  billingProvider?: string | null;
+  plan?: "free" | "pro" | "trial";
   isPro?: boolean;
   createdAt?: string;
 }
+
+type PlanOption = "free" | "pro" | "trial";
+
+const PLAN_BADGE: Record<PlanOption, string> = {
+  pro: "bg-emerald-900/60 text-emerald-300 border border-emerald-500/30",
+  trial: "bg-sky-900/60 text-sky-300 border border-sky-500/30",
+  free: "bg-gray-800 text-gray-400 border border-gray-700",
+};
+
+const getErrorMessage = (err: unknown, fallback: string) =>
+  (err as { response?: { data?: { message?: string } } })?.response?.data
+    ?.message || (err instanceof Error ? err.message : fallback);
 
 interface ReviewData {
   _id: string;
@@ -66,6 +82,11 @@ interface GatewayHealthData {
 interface IntegrationStatus {
   connected: boolean;
   message?: string;
+  optional?: boolean;
+  restricted?: boolean;
+  state?: string;
+  latencyMs?: number;
+  source?: string;
 }
 
 interface ApiUsageData {
@@ -81,6 +102,9 @@ interface ApiUsageData {
   expoBuildsLimit: number | null;
   expoOtaBandwidthMB: number | null;
   expoOtaLimitMB: number | null;
+  dbConnected?: boolean;
+  expoBillingPeriod?: { start: string; end: string } | null;
+  expoUsageSource?: string | null;
   services?: Record<string, IntegrationStatus>;
 }
 
@@ -103,10 +127,12 @@ const EMPTY_API_USAGE: ApiUsageData = {
 const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
   Resend: ["RESEND_API_KEY", "RESEND_FROM_EMAIL", "RESEND_MONTHLY_LIMIT"],
   "MongoDB Atlas": [
-    "MONGODB_ATLAS_GROUP_ID or MONGODB_ATLAS_PROJECT_ID",
-    "MONGODB_ATLAS_PUBLIC_KEY",
-    "MONGODB_ATLAS_PRIVATE_KEY",
-    "MONGODB_ATLAS_CLUSTER_NAME",
+    "MONGO_URI or MONGODB_URI (live connection, required)",
+    "MONGODB_STORAGE_LIMIT_MB (optional quota, e.g. 512)",
+    "Optional Atlas Admin API: MONGODB_ATLAS_GROUP_ID",
+    "Optional Atlas Admin API: MONGODB_ATLAS_PUBLIC_KEY",
+    "Optional Atlas Admin API: MONGODB_ATLAS_PRIVATE_KEY",
+    "Allow this server's IP in the Atlas API key access list",
   ],
   "Gemini AI": [
     "GOOGLE_CLOUD_PROJECT_ID",
@@ -122,6 +148,11 @@ const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
+  ],
+  RevenueCat: [
+    "REVENUECAT_SECRET_API_KEY",
+    "REVENUECAT_ENTITLEMENT_ID (default: pro)",
+    "REVENUECAT_WEBHOOK_AUTH",
   ],
   "Paddle & Billing": [
     "PADDLE_API_KEY",
@@ -207,7 +238,9 @@ export default function AdminPage() {
           axios
             .get(`${API_BASE_URL}/api/admin/api-usage`, config)
             .catch(() => ({ data: { data: EMPTY_API_USAGE } })),
-          axios.get(`${API_BASE_URL}/api/admin/gateway-health`, config),
+          axios
+            .get(`${API_BASE_URL}/api/admin/gateway-health`, config)
+            .catch(() => ({ data: { data: null } })),
         ]);
 
       setStats(statsRes.data.data);
@@ -222,8 +255,12 @@ export default function AdminPage() {
           `${API_BASE_URL}/api/admin/revenue`,
           config,
         );
-        setRevenue(revenueRes.data.data);
-        setRevenueStatus("");
+        setRevenue(revenueRes.data.data || null);
+        setRevenueStatus(
+          revenueRes.data.configured === false
+            ? revenueRes.data.message || "Paddle billing is not configured yet."
+            : "",
+        );
       } catch (revenueError: unknown) {
         setRevenue(null);
         setRevenueStatus(
@@ -278,12 +315,80 @@ export default function AdminPage() {
         user.email.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesTier =
-        tierFilter === "all" ||
-        (user.subscriptionTier || "free") === tierFilter;
+        tierFilter === "all" || (user.plan || "free") === tierFilter;
 
       return matchesSearch && matchesTier;
     });
   }, [users, searchTerm, tierFilter]);
+
+  const [updatingPlanFor, setUpdatingPlanFor] = useState<string | null>(null);
+  const [planNotice, setPlanNotice] = useState<{
+    tone: "ok" | "warn" | "error";
+    text: string;
+  } | null>(null);
+
+  const handleChangePlan = async (user: UserData, plan: PlanOption) => {
+    if ((user.plan || "free") === plan || updatingPlanFor) return;
+
+    let durationDays: number | null = null;
+    if (plan === "trial" || plan === "pro") {
+      const answer = window.prompt(
+        plan === "trial"
+          ? `Trial length in days for ${user.email}:`
+          : `Pro duration in days for ${user.email} (leave empty for no expiry):`,
+        plan === "trial" ? "7" : "",
+      );
+      if (answer === null) return;
+      const trimmed = answer.trim();
+      if (trimmed) {
+        durationDays = Number(trimmed);
+        if (!Number.isInteger(durationDays) || durationDays < 1) {
+          setPlanNotice({ tone: "error", text: "Enter a whole number of days." });
+          return;
+        }
+      }
+    } else if (
+      !window.confirm(`Switch ${user.email} to the Free plan? Pro access ends immediately.`)
+    ) {
+      return;
+    }
+
+    setUpdatingPlanFor(user._id);
+    setPlanNotice(null);
+    try {
+      const token = localStorage.getItem("token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const res = await axios.patch(
+        `${API_BASE_URL}/api/admin/users/${user._id}/subscription`,
+        { plan, durationDays },
+        config,
+      );
+      const updated: UserData | undefined = res.data?.data;
+      if (updated) {
+        setUsers((current) =>
+          current.map((item) => (item._id === updated._id ? updated : item)),
+        );
+      }
+      setPlanNotice({
+        tone: res.data?.warning ? "warn" : "ok",
+        text: res.data?.warning || res.data?.message || "Plan updated.",
+      });
+      // Refresh counts and the audit log so they reflect the change.
+      const [statsRes, logsRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/admin/stats`, config),
+        axios.get(`${API_BASE_URL}/api/admin/logs`, config),
+      ]);
+      setStats(statsRes.data.data);
+      setLogs(logsRes.data.data || []);
+    } catch (err: unknown) {
+      setPlanNotice({
+        tone: "error",
+        text: "Could not update plan: " + getErrorMessage(err, "Unknown error"),
+      });
+    } finally {
+      setUpdatingPlanFor(null);
+    }
+  };
 
   const handleDeleteUser = async (userId: string) => {
     if (
@@ -564,9 +669,12 @@ export default function AdminPage() {
       : Math.min(100, (used / limit) * 100);
   const integrationsConnected =
     Object.values(apiUsage.services || {}).length > 0 &&
-    Object.values(apiUsage.services || {}).every(
-      (service) => service.connected,
-    );
+    Object.values(apiUsage.services || {})
+      // Optional extras (Atlas Admin API) don't mark the platform unhealthy.
+      .filter((service) => !service.optional)
+      .every((service) => service.connected);
+  const database = apiUsage.services?.database;
+  const atlas = apiUsage.services?.atlas;
 
   if (loading) {
     return (
@@ -921,17 +1029,37 @@ export default function AdminPage() {
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-gray-300">MongoDB</span>
                     <span
-                      className={`font-bold ${apiUsage.services?.atlas?.connected ? "text-emerald-400" : "text-sky-400"}`}
+                      className={`font-bold ${
+                        database?.connected
+                          ? "text-emerald-400"
+                          : database
+                            ? "text-red-400"
+                            : "text-gray-500"
+                      }`}
                     >
-                      {apiUsage.services?.atlas?.connected
+                      {database?.connected
                         ? "Connected"
-                        : formatUsage(
-                            apiUsage.dbStorageUsedMB,
-                            apiUsage.dbLimitMB,
-                            " MB",
-                          )}
+                        : database
+                          ? "Not connected"
+                          : "Status unavailable"}
                     </span>
                   </div>
+                  {database?.connected && (
+                    <div className="flex justify-between text-[11px] text-gray-400">
+                      <span>
+                        {apiUsage.dbStorageUsedMB != null
+                          ? formatUsage(
+                              apiUsage.dbStorageUsedMB,
+                              apiUsage.dbLimitMB,
+                              " MB",
+                            )
+                          : "Storage size unavailable"}
+                      </span>
+                      {typeof database.latencyMs === "number" && (
+                        <span>{database.latencyMs} ms</span>
+                      )}
+                    </div>
+                  )}
                   {checkHighUsage(
                     apiUsage.dbStorageUsedMB,
                     apiUsage.dbLimitMB,
@@ -952,9 +1080,16 @@ export default function AdminPage() {
                     ></div>
                   </div>
                   <p className="text-[11px] text-gray-400">
-                    {apiUsage.services?.atlas?.message ||
-                      "MongoDB connected successfully via Mongoose."}
+                    {database?.message ||
+                      "Live database status is not available yet."}
                   </p>
+                  {atlas && !atlas.connected && atlas.message && (
+                    <p
+                      className={`text-[10px] ${atlas.restricted ? "text-amber-400/80" : "text-gray-500"}`}
+                    >
+                      Atlas metrics (optional): {atlas.message}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -1097,6 +1232,13 @@ export default function AdminPage() {
                     {apiUsage.services?.expo?.message ||
                       "Expo EAS access requires a server token and project ID."}
                   </p>
+                  {apiUsage.expoBillingPeriod && (
+                    <p className="text-[10px] text-gray-500">
+                      Billing period{" "}
+                      {new Date(apiUsage.expoBillingPeriod.start).toLocaleDateString()}{" "}
+                      – {new Date(apiUsage.expoBillingPeriod.end).toLocaleDateString()}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -1503,10 +1645,34 @@ export default function AdminPage() {
               >
                 <option value="all">All Tiers</option>
                 <option value="pro">Pro</option>
+                <option value="trial">Trial</option>
                 <option value="free">Free</option>
               </select>
             </div>
           </div>
+
+          {planNotice && (
+            <div
+              role="status"
+              className={`mx-6 mt-4 px-4 py-2.5 rounded-lg text-sm border flex items-start justify-between gap-3 ${
+                planNotice.tone === "ok"
+                  ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
+                  : planNotice.tone === "warn"
+                    ? "bg-amber-950/40 border-amber-500/40 text-amber-300"
+                    : "bg-red-950/40 border-red-500/40 text-red-300"
+              }`}
+            >
+              <span>{planNotice.text}</span>
+              <button
+                type="button"
+                onClick={() => setPlanNotice(null)}
+                className="text-xs opacity-70 hover:opacity-100"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -1542,15 +1708,54 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="p-4">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            user.subscriptionTier === "pro"
-                              ? "bg-emerald-900/60 text-emerald-300 border border-emerald-500/30"
-                              : "bg-gray-800 text-gray-400"
-                          }`}
-                        >
-                          {user.subscriptionTier || "free"}
-                        </span>
+                        {(() => {
+                          const plan = (user.plan || "free") as PlanOption;
+                          const busy = updatingPlanFor === user._id;
+                          return (
+                            <div className="flex flex-col gap-1.5 min-w-37.5">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${PLAN_BADGE[plan]}`}
+                                >
+                                  {plan}
+                                </span>
+                                <select
+                                  aria-label={`Change plan for ${user.email}`}
+                                  value={plan}
+                                  disabled={busy || Boolean(updatingPlanFor)}
+                                  onChange={(e) =>
+                                    void handleChangePlan(
+                                      user,
+                                      e.target.value as PlanOption,
+                                    )
+                                  }
+                                  className="bg-gray-950 border border-gray-800 text-gray-200 px-2 py-1 rounded-md text-xs focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                                >
+                                  <option value="free">Free</option>
+                                  <option value="pro">Pro</option>
+                                  <option value="trial">Trial</option>
+                                </select>
+                                {busy && (
+                                  <span className="text-[11px] text-gray-500">
+                                    Saving…
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-gray-500">
+                                {user.subscriptionExpiresAt && plan !== "free"
+                                  ? `Until ${new Date(user.subscriptionExpiresAt).toLocaleDateString()}`
+                                  : plan !== "free"
+                                    ? "No expiry"
+                                    : user.subscriptionStatus === "expired"
+                                      ? "Expired"
+                                      : ""}
+                                {user.billingProvider
+                                  ? ` · via ${user.billingProvider}`
+                                  : ""}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="p-4">
                         {user.role !== "admin" && (
