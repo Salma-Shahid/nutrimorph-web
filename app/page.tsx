@@ -68,16 +68,45 @@ const fetchWithTimeout = async (
   }
 };
 
+type WebCheckoutMode = "revenuecat" | "paddle" | "app";
+
+const PLAY_STORE_URL =
+  "https://play.google.com/store/apps/details?id=com.salmashahid.nutrimorph";
+const PLAY_SUBSCRIPTIONS_URL =
+  "https://play.google.com/store/account/subscriptions";
+
+// Optional RevenueCat Web Purchase Link base (https://pay.rev.cat/<token>).
+// The backend config can provide it too; this env var wins when set.
+const toHttpsUrl = (value?: string | null) => {
+  const raw = (value || "").trim();
+  return /^https:\/\/\S+$/i.test(raw) ? raw.replace(/\/+$/, "") : null;
+};
+const WEB_PURCHASE_URL_ENV = toHttpsUrl(
+  process.env.NEXT_PUBLIC_REVENUECAT_WEB_PURCHASE_URL,
+);
+
+// RevenueCat Web Purchase Links take the app user ID as the last path
+// segment, so the purchase is granted to this NutriMorph account.
+const buildWebPurchaseLink = (base: string, appUserId: string, email: string) => {
+  const url = `${base}/${encodeURIComponent(appUserId)}`;
+  return email ? `${url}?email=${encodeURIComponent(email)}` : url;
+};
+
 export default function Home() {
   const paddleRef = useRef<Paddle | null>(null);
   // Resolves once Paddle.js has loaded (or null if it can't), so a click made
   // while it is still loading waits instead of failing.
   const paddleReadyRef = useRef<Promise<Paddle | null> | null>(null);
-  // null = not checked yet; true/false from GET /api/payment/config.
-  const [webCheckoutAvailable, setWebCheckoutAvailable] = useState<
-    boolean | null
-  >(null);
-  const [webCheckoutMessage, setWebCheckoutMessage] = useState("");
+  // How Pro is sold on the website (from GET /api/payment/config):
+  // "revenuecat" = RevenueCat Web Purchase Link, "paddle" = legacy fallback,
+  // "app" = subscribe in the mobile app. null until loaded.
+  const [webCheckout, setWebCheckout] = useState<WebCheckoutMode | null>(
+    null,
+  );
+  const [webPurchaseUrl, setWebPurchaseUrl] = useState<string | null>(
+    WEB_PURCHASE_URL_ENV,
+  );
+  const [userId, setUserId] = useState("");
   const [planActionLoading, setPlanActionLoading] = useState(false);
   const [billingProvider, setBillingProvider] = useState<string | null>(null);
   const [isYearly, setIsYearly] = useState(false);
@@ -152,18 +181,18 @@ export default function Home() {
       .then(readJson)
       .then((result) => {
         if (!active) return;
-        const paddle = result?.data?.paddle;
-        setWebCheckoutAvailable(Boolean(paddle?.configured));
-        setWebCheckoutMessage(
-          paddle?.configured
-            ? ""
-            : paddle?.message ||
-                "Web checkout is not available yet. Subscribe in the NutriMorph mobile app.",
+        const data = result?.data;
+        const linkUrl =
+          WEB_PURCHASE_URL_ENV || toHttpsUrl(data?.revenueCat?.webPurchaseUrl);
+        setWebPurchaseUrl(linkUrl);
+        setWebCheckout(
+          linkUrl ? "revenuecat" : data?.paddle?.configured ? "paddle" : "app",
         );
       })
       .catch(() => {
-        // Unknown: let the user try; the checkout request reports the reason.
-        if (active) setWebCheckoutAvailable(null);
+        // Backend unreachable: never block. Use the web link if the site has
+        // one, otherwise guide the user to the app.
+        if (active) setWebCheckout(WEB_PURCHASE_URL_ENV ? "revenuecat" : "app");
       });
     return () => {
       active = false;
@@ -240,6 +269,7 @@ export default function Home() {
 
           setCurrentPlan(userPlan);
           setBillingProvider(userObj?.billingProvider || null);
+          setUserId(String(userObj?._id || userObj?.id || ""));
           localStorage.setItem("userPlan", userPlan);
 
           if (userEmail) {
@@ -275,31 +305,38 @@ export default function Home() {
     const queryParams = new URLSearchParams(window.location.search);
     const paymentStatus = queryParams.get("payment");
 
-    if (paymentStatus !== "pending") return;
+    // "success" = RevenueCat Web Purchase Link redirect; "pending" = Paddle.
+    if (paymentStatus !== "pending" && paymentStatus !== "success") return;
 
     const verifySubscription = async () => {
       try {
         const token = localStorage.getItem("token");
         if (!token)
           throw new Error("Please sign in to verify your subscription.");
+        // Ask the server to re-check RevenueCat now instead of waiting for
+        // the webhook. Failure is fine: the webhook still grants access.
+        await fetchWithTimeout(`${API_BASE_URL}/api/payment/revenuecat/sync`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => null);
         const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
-        const result = await response.json();
+        const result = await readJson(response);
         if (!response.ok) {
           throw new Error(
             result.message || "Could not verify the subscription.",
           );
         }
         const profile = result?.user || result;
-        if (profile.subscriptionTier === "pro" && profile.isPro === true) {
+        if (profile?.isPro === true) {
           setCurrentPlan("pro");
           localStorage.setItem("userPlan", "pro");
           alert("Your payment was verified and Pro is active.");
         } else {
           alert(
-            "Checkout completed. Pro access will appear after Paddle's verified payment webhook is processed.",
+            "Checkout completed. Pro access will appear within a minute, as soon as your payment is confirmed. It also unlocks in the NutriMorph app with the same account.",
           );
         }
       } catch (error) {
@@ -414,6 +451,17 @@ export default function Home() {
         );
         return;
       }
+      if (billingProvider === "revenuecat") {
+        // RevenueCat subscriptions are managed where they were bought.
+        if (
+          window.confirm(
+            "Your Pro subscription is managed by Google Play, the App Store, or (for web purchases) the RevenueCat billing email you received.\n\nOpen Google Play subscriptions now?",
+          )
+        ) {
+          window.open(PLAY_SUBSCRIPTIONS_URL, "_blank", "noopener,noreferrer");
+        }
+        return;
+      }
       if (
         !window.confirm(
           "Switch to the Free plan? Your Pro subscription will be cancelled at the end of the current billing period.",
@@ -462,10 +510,45 @@ export default function Home() {
 
     setSelectedPlan(planName);
     setLoading(false);
-    setErrorMessage(
-      webCheckoutAvailable === false ? webCheckoutMessage : "",
-    );
+    setErrorMessage("");
     setShowSubModal(true);
+  };
+
+  // Config may still be loading on a fast click: use the site's web link if
+  // it has one, otherwise guide to the app. Never a dead state.
+  const checkoutMode: WebCheckoutMode =
+    webCheckout ?? (webPurchaseUrl ? "revenuecat" : "app");
+
+  // The NutriMorph account ID is the RevenueCat app user ID.
+  const resolveUserId = async (token: string) => {
+    if (userId) return userId;
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    const result = await readJson(response);
+    if (!response.ok) {
+      throw new Error(result?.message || "Please sign in again to continue.");
+    }
+    const id = String(result?.user?._id || result?._id || "");
+    if (!id) throw new Error("Could not identify your account. Please sign in again.");
+    setUserId(id);
+    return id;
+  };
+
+  const openRevenueCatWebCheckout = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setShowSubModal(false);
+      setShowLoginModal(true);
+      return;
+    }
+    if (!webPurchaseUrl) {
+      throw new Error("Web checkout link is missing. Subscribe in the NutriMorph app.");
+    }
+    const id = await resolveUserId(token);
+    // Same tab, so RevenueCat's success redirect (?payment=success) returns here.
+    window.location.assign(buildWebPurchaseLink(webPurchaseUrl, id, email));
   };
 
   const openPaddleCheckout = async (
@@ -572,14 +655,21 @@ export default function Home() {
           process.env.NEXT_PUBLIC_VITE_PADDLE_MONTHLY_PRICE_ID ||
           process.env.VITE_PADDLE_MONTHLY_PRICE_ID;
     if (loading) return;
-    if (webCheckoutAvailable === false) {
-      setErrorMessage(webCheckoutMessage);
+
+    if (checkoutMode === "app") {
+      // No web checkout configured: send the user to the app, where Pro is
+      // sold through Google Play via RevenueCat.
+      window.open(PLAY_STORE_URL, "_blank", "noopener,noreferrer");
       return;
     }
 
     setLoading(true);
     setErrorMessage("");
     try {
+      if (checkoutMode === "revenuecat") {
+        await openRevenueCatWebCheckout();
+        return;
+      }
       await openPaddleCheckout(priceId, billingCycle);
       // The overlay is open; close our modal so it doesn't sit behind it.
       setShowSubModal(false);
@@ -1232,7 +1322,9 @@ export default function Home() {
                 {isYearly ? "Yearly billing" : "Monthly billing"}
               </div>
               <p className="text-slate-400 text-sm mb-6">
-                Final amount and currency are shown in secure Paddle Checkout.
+                {checkoutMode === "app"
+                  ? "Subscribe in the NutriMorph app. Final price is shown by Google Play."
+                  : "Final amount and currency are shown in secure checkout."}
               </p>
             </div>
             <button
@@ -1272,25 +1364,41 @@ export default function Home() {
             </p>
 
             <form onSubmit={handleSubscriptionCheckout} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              {/* Hidden configuration info for Gemini AI tier tracking */}
-              <input
-                type="hidden"
-                name="aiModel"
-                value="gemini-3.5-flash-lite"
-              />
+              {checkoutMode === "app" ? (
+                <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 text-sm text-slate-300 space-y-2">
+                  <p className="font-semibold text-white">
+                    Subscribe in the NutriMorph app
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                    <li>Install or open NutriMorph on your phone.</li>
+                    <li>
+                      Sign in with{" "}
+                      <span className="text-emerald-400">
+                        {email || "this account"}
+                      </span>
+                      .
+                    </li>
+                    <li>Go to Profile → Upgrade to Pro and choose a plan.</li>
+                  </ol>
+                  <p className="text-xs text-slate-500">
+                    Pro unlocks on every device signed in to this account,
+                    including this website.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              )}
 
               {errorMessage && (
                 <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg">
@@ -1300,18 +1408,29 @@ export default function Home() {
 
               <button
                 type="submit"
-                disabled={loading || webCheckoutAvailable === false}
+                disabled={loading}
                 className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl transition flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>
                   {loading
                     ? "Opening secure checkout..."
-                    : webCheckoutAvailable === false
-                      ? "Web checkout unavailable"
+                    : checkoutMode === "app"
+                      ? "Get the NutriMorph App"
                       : "Proceed to Secure Checkout"}
                 </span>
               </button>
+
+              {checkoutMode !== "app" && (
+                <a
+                  href={PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center text-xs text-slate-400 hover:text-emerald-400"
+                >
+                  Prefer the app? Subscribe in NutriMorph on Google Play
+                </a>
+              )}
             </form>
           </div>
         </div>
