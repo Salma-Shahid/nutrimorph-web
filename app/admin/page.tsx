@@ -13,9 +13,23 @@ interface StatsData {
 }
 
 interface RevenueData {
-  totalRevenue: number;
+  primaryProvider: "revenuecat";
   activeSubscriptions: number;
-  currency: string;
+  revenueCat: {
+    connected: boolean;
+    missing: string[];
+    activeSubscribers: number | null;
+    activeTrials: number | null;
+    message: string;
+  };
+  // Optional legacy fallback.
+  paddle: {
+    connected: boolean;
+    legacy: true;
+    totalRevenue: number | null;
+    currency: string;
+    message: string;
+  };
 }
 
 interface UserData {
@@ -77,6 +91,15 @@ interface GatewayHealthData {
     lastEventAt: string;
   }>;
   message?: string;
+  paddleConfigured?: boolean;
+  paddleMessage?: string;
+  revenueCat?: {
+    connected: boolean;
+    missing: string[];
+    activeSubscribers: number | null;
+    activeTrials: number | null;
+    message: string;
+  };
 }
 
 interface IntegrationStatus {
@@ -149,12 +172,13 @@ const SERVER_ENVIRONMENT_KEYS: Record<string, string[]> = {
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
   ],
-  RevenueCat: [
+  "RevenueCat (primary billing)": [
     "REVENUECAT_SECRET_API_KEY",
-    "REVENUECAT_ENTITLEMENT_ID (default: pro)",
     "REVENUECAT_WEBHOOK_AUTH",
+    "REVENUECAT_ENTITLEMENT_ID (must match the app; server default: pro)",
+    "Webhook URL: https://<backend>/api/payment/revenuecat/webhook",
   ],
-  "Paddle & Billing": [
+  "Paddle (optional legacy fallback)": [
     "PADDLE_API_KEY",
     "PADDLE_WEBHOOK_SECRET",
     "PADDLE_ENV",
@@ -256,16 +280,18 @@ export default function AdminPage() {
           config,
         );
         setRevenue(revenueRes.data.data || null);
+        // Warns only about RevenueCat (primary). Paddle is an optional fallback.
         setRevenueStatus(
-          revenueRes.data.configured === false
-            ? revenueRes.data.message || "Paddle billing is not configured yet."
-            : "",
+          revenueRes.data.message ||
+            (revenueRes.data.configured === false
+              ? "RevenueCat (primary billing) is not configured yet."
+              : ""),
         );
       } catch (revenueError: unknown) {
         setRevenue(null);
         setRevenueStatus(
           (revenueError as { response?: { data?: { message?: string } } })
-            ?.response?.data?.message || "Verified Paddle revenue is unavailable.",
+            ?.response?.data?.message || "Billing status is unavailable.",
         );
       }
     } catch (err: unknown) {
@@ -336,7 +362,7 @@ export default function AdminPage() {
         plan === "trial"
           ? `Trial length in days for ${user.email}:`
           : `Pro duration in days for ${user.email} (leave empty for no expiry):`,
-        plan === "trial" ? "7" : "",
+        plan === "trial" ? "3" : "",
       );
       if (answer === null) return;
       const trimmed = answer.trim();
@@ -757,27 +783,46 @@ export default function AdminPage() {
 
         {/* Revenue & Subscription Management */}
         {revenue && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between hover:border-emerald-500/40 transition">
-              <div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* RevenueCat: primary billing */}
+            <div
+              className={`bg-gray-900/80 p-6 rounded-2xl border shadow-xl transition ${
+                revenue.revenueCat.connected
+                  ? "border-gray-800 hover:border-emerald-500/40"
+                  : "border-amber-500/40"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-gray-400 text-sm font-medium">
-                  Paddle Verified Transaction Volume (30 days, USD)
+                  RevenueCat (primary billing)
                 </p>
-                <p className="text-3xl font-extrabold text-emerald-400 mt-2">
-                  ${revenue.totalRevenue.toFixed(2)}{" "}
-                  <span className="text-xs text-gray-400">
-                    {revenue.currency}
-                  </span>
-                </p>
+                <span
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
+                    revenue.revenueCat.connected
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                      : "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                  }`}
+                >
+                  {revenue.revenueCat.connected ? "Configured" : "Not configured"}
+                </span>
               </div>
-              <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 text-emerald-400 text-2xl">
-                $
-              </div>
+              <p className="text-3xl font-extrabold text-emerald-400 mt-2">
+                {revenue.revenueCat.activeSubscribers ?? "—"}{" "}
+                <span className="text-xs text-gray-400">
+                  store subscribers
+                  {revenue.revenueCat.activeTrials
+                    ? ` · ${revenue.revenueCat.activeTrials} on trial`
+                    : ""}
+                </span>
+              </p>
+              <p className="text-[11px] text-gray-500 mt-2">
+                Store revenue is reported in the RevenueCat dashboard.
+              </p>
             </div>
             <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl flex items-center justify-between hover:border-sky-500/40 transition">
               <div>
                 <p className="text-gray-400 text-sm font-medium">
-                  Active Pro Subscriptions
+                  Active Pro Subscriptions (all providers)
                 </p>
                 <p className="text-3xl font-extrabold text-sky-400 mt-2">
                   {revenue.activeSubscriptions}{" "}
@@ -788,9 +833,31 @@ export default function AdminPage() {
                 Pro
               </div>
             </div>
+            {/* Paddle: optional legacy fallback */}
+            <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 shadow-xl">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-gray-400 text-sm font-medium">
+                  Paddle (legacy fallback, 30 days)
+                </p>
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded border bg-gray-800 text-gray-400 border-gray-700">
+                  {revenue.paddle.connected ? "Configured" : "Optional"}
+                </span>
+              </div>
+              <p className="text-3xl font-extrabold text-gray-300 mt-2">
+                {revenue.paddle.totalRevenue == null
+                  ? "—"
+                  : `$${revenue.paddle.totalRevenue.toFixed(2)}`}{" "}
+                <span className="text-xs text-gray-400">
+                  {revenue.paddle.currency}
+                </span>
+              </p>
+              <p className="text-[11px] text-gray-500 mt-2">
+                {revenue.paddle.message}
+              </p>
+            </div>
           </div>
         )}
-        {!revenue && revenueStatus && (
+        {revenueStatus && (
           <p className="text-sm text-amber-300">{revenueStatus}</p>
         )}
 
@@ -905,7 +972,7 @@ export default function AdminPage() {
               {/* DIRECT BILLING & CONFIG ACTION BUTTON */}
               <button
                 onClick={() => {
-                  setSelectedService("Paddle & Billing");
+                  setSelectedService("RevenueCat (primary billing)");
                   setIsConfigModalOpen(true);
                 }}
                 className="bg-gray-950 hover:bg-gray-800 border border-amber-500/40 text-amber-300 p-4 rounded-xl text-xs font-semibold transition text-left space-y-1 hover:scale-[1.02]"
@@ -1329,7 +1396,11 @@ export default function AdminPage() {
                   Payment Settlement & Webhook Health
                 </h2>
                 <p className="text-gray-400 text-sm mt-1">
-                  Monitor verified Paddle transactions. Configure notifications and review merchant payouts in Paddle.
+                  {gatewayHealth.message ||
+                    "RevenueCat is the primary billing provider."}
+                </p>
+                <p className="text-gray-500 text-xs mt-1">
+                  {gatewayHealth.paddleMessage}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -1341,7 +1412,7 @@ export default function AdminPage() {
                   disabled={testingWebhook}
                   className="bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold px-4 py-1.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {testingWebhook ? "Checking..." : "Check Paddle Configuration"}
+                  {testingWebhook ? "Checking..." : "Check Billing Configuration"}
                 </button>
               </div>
             </div>
@@ -1357,7 +1428,7 @@ export default function AdminPage() {
               </div>
               <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
                 <p className="text-gray-400 text-xs font-medium">
-                  Verified Transactions (30 days)
+                  Paddle Verified Transactions (30 days, legacy)
                 </p>
                 <p className="text-lg font-bold text-sky-400">
                   {gatewayHealth.verifiedTransactions30d == null
@@ -1367,7 +1438,7 @@ export default function AdminPage() {
               </div>
               <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-1">
                 <p className="text-gray-400 text-xs font-medium">
-                  Pending Event Processing
+                  Paddle Pending Events (legacy)
                 </p>
                 <p className="text-lg font-bold text-amber-400">
                   {gatewayHealth.pendingWebhookEvents == null
