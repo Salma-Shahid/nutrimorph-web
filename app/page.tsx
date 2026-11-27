@@ -70,8 +70,13 @@ const fetchWithTimeout = async (
 
 type WebCheckoutMode = "revenuecat" | "paddle" | "app";
 
+// Must match `expo.android.package` in nutrimorph/app.json. Override with
+// NEXT_PUBLIC_PLAY_STORE_URL (full URL) or NEXT_PUBLIC_ANDROID_PACKAGE.
+const ANDROID_PACKAGE =
+  process.env.NEXT_PUBLIC_ANDROID_PACKAGE?.trim() || "com.nutrimorph.app";
 const PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.salmashahid.nutrimorph";
+  process.env.NEXT_PUBLIC_PLAY_STORE_URL?.trim() ||
+  `https://play.google.com/store/apps/details?id=${encodeURIComponent(ANDROID_PACKAGE)}`;
 const PLAY_SUBSCRIPTIONS_URL =
   "https://play.google.com/store/account/subscriptions";
 
@@ -820,7 +825,7 @@ export default function Home() {
         {/* Download Buttons (Google Play & App Store Badges) */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href="https://play.google.com/store/apps/details?id=com.salmashahid.nutrimorph"
+            href={PLAY_STORE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full sm:w-auto inline-flex items-center justify-center space-x-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold px-6 py-3.5 rounded-xl transition"
